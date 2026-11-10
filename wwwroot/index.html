@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HardwarePanel</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; overflow: hidden; }
+  body { margin: 0; display: flex; flex-direction: column;
+         font: 14px/1.4 system-ui, sans-serif; background: #111; color: #ddd;
+         -webkit-tap-highlight-color: transparent; user-select: none; }
+  header { flex: none; display: flex; align-items: center; height: 32px;
+           padding: 0 10px; background: #161616; border-bottom: 1px solid #222; }
+  header h1 { font-size: 14px; margin: 0; font-weight: 600; white-space: nowrap; }
+  #t { color: #555; font-size: 11px; margin-left: 8px; font-weight: normal; }
+  #gear { margin-left: auto; color: #8ab4f8; font-size: 18px; text-decoration: none; line-height: 1; }
+  #tiles { flex: 1; display: grid; min-height: 0; padding: 10px; gap: 10px;
+           grid-auto-rows: minmax(0, 1fr);
+           grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .tile { display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+          background: #181818; border: 1px solid #262626; border-radius: 10px; padding: 8px 10px;
+          box-sizing: border-box; }
+  .tile .label { font-size: 13px; font-size: clamp(11px, 2vmin, 16px); color: #999;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .val { font-size: 24px; font-size: clamp(16px, 5vmin, 42px); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tile .unit { font-size: 12px; font-size: clamp(10px, 1.6vmin, 14px); color: #777; margin-left: 4px; }
+  .tile svg { flex: 1; min-height: 0; width: 100%; }
+  .tile svg polyline { fill: none; stroke: #8ab4f8; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  /* 旧 WebView 无 CSS Grid（<57）时的 flex 回退：磁贴照常铺排，允许滚动 */
+  .no-grid #tiles { display: flex; flex-wrap: wrap; align-content: flex-start; overflow-y: auto; }
+  .no-grid .tile { flex: 1 1 140px; min-height: 64px; margin: 0 10px 10px 0; }
+  #empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #777; }
+  #empty[hidden] { display: none; }
+  #empty a { color: #8ab4f8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>硬件监控<span id="t"></span></h1>
+  <a id="gear" href="/settings.html" title="设置">⚙</a>
+</header>
+<div id="tiles"></div>
+<div id="empty" hidden>
+  未选择任何传感器
+  <a href="/settings.html">前往设置页选择</a>
+</div>
+<script src="/notify.js"></script>
+<script>
+// 全 ES5：兼容安卓 5 旧 WebView（无 fetch/箭头函数/模板串/let/??/?./Map/Set）。
+var UNITS = { Temperature: '°C', Load: '%', Power: 'W', Fan: 'RPM', Data: 'GB', Clock: 'MHz', Voltage: 'V', Current: 'A' };
+var SPARK_NAMES = ['CPU Total', 'CPU Package', 'Core Average', 'Memory', '总使用率'];
+var HIST_LEN = 300;
+
+var hist = {};   // key -> number[]（本地滚动历史，用于总值曲线）
+var cells = {};  // key -> { v, unit, line, sensor }
+var cfg = null, booted = false;
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function keyOf(r) { return r.hardware + '|' + r.sensor + '|' + r.type; }
+function isSpark(name) { return SPARK_NAMES.indexOf(name) !== -1; }
+
+function getJson(url, cb) {
+  var x = new XMLHttpRequest();
+  x.open('GET', url, true);
+  x.onreadystatechange = function () {
+    if (x.readyState === 4) {
+      var data = null;
+      if (x.status === 200) { try { data = JSON.parse(x.responseText); } catch (e) { data = null; } }
+      cb(data);
+    }
+  };
+  x.send(null);
+}
+
+function points(h) {
+  var min = Infinity, max = -Infinity, i;
+  for (i = 0; i < h.length; i++) { if (h[i] < min) min = h[i]; if (h[i] > max) max = h[i]; }
+  var span = (max - min) || 1, out = [];
+  for (i = 0; i < h.length; i++)
+    out.push((i / (h.length - 1) * 100).toFixed(1) + ',' + (15 - (h[i] - min) / span * 13).toFixed(1));
+  return out.join(' ');
+}
+
+var tilesEl, emptyEl;
+
+// 全量渲染：按 cfg.visible 顺序建磁贴；数据里没有的键显示 — 占位
+function fullRender(rows) {
+  var byKey = {}, i, r;
+  for (i = 0; i < rows.length; i++) { r = rows[i]; byKey[keyOf(r)] = r; }
+  tilesEl.innerHTML = '';
+  cells = {};
+  var hasVisible = cfg && cfg.visible && cfg.visible.length > 0;
+  emptyEl.hidden = !!hasVisible;
+  tilesEl.style.display = hasVisible ? '' : 'none';
+  if (!hasVisible) return;
+  for (i = 0; i < cfg.visible.length; i++) {
+    var key = cfg.visible[i];
+    r = byKey[key];
+    var label = r ? r.sensor : key.split('|')[1];
+    var tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.innerHTML =
+      '<div class="label">' + esc(label) + '</div>' +
+      '<div class="val"><span class="v">—</span><span class="unit"></span></div>' +
+      (r && isSpark(r.sensor)
+        ? '<svg viewBox="0 0 100 16" preserveAspectRatio="none"><polyline points=""/></svg>'
+        : '');
+    tilesEl.appendChild(tile);
+    cells[key] = {
+      v: tileGet(tile, '.v'),
+      unit: tileGet(tile, '.unit'),
+      line: tileGet(tile, 'polyline'),
+      sensor: label
+    };
+    if (r) {
+      hist[key] = r.history || [];
+      setVal(key, r, true);
+    }
+  }
+}
+
+function tileGet(tile, sel) {
+  var list = tile.querySelectorAll(sel);
+  return list.length ? list[0] : null;
+}
+
+function setVal(key, r, skipPush) {
+  var c = cells[key];
+  if (!c) return;
+  c.v.textContent = r.value === null || r.value === undefined ? '—' : r.value;
+  c.unit.textContent = (r.value !== null && r.value !== undefined && UNITS[r.type]) ? UNITS[r.type] : '';
+  if (isSpark(c.sensor) && typeof r.value === 'number' && !skipPush) {
+    var h = hist[key];
+    if (!h) h = hist[key] = [];
+    h.push(r.value);
+    if (h.length > HIST_LEN) h.shift();
+    if (c.line && h.length > 1) c.line.setAttribute('points', points(h));
+  }
+  if (skipPush && c.line && hist[key] && hist[key].length > 1)
+    c.line.setAttribute('points', points(hist[key]));
+}
+
+// 增量更新：只作用于 visible 中的键；本轮缺失的键（传感器消失）回退为 —
+function applyUpdate(rows) {
+  var seen = {}, i, r, key;
+  for (i = 0; i < rows.length; i++) {
+    r = rows[i];
+    key = keyOf(r);
+    seen[key] = true;
+    if (cells[key]) setVal(key, r);
+  }
+  for (key in cells)
+    if (cells.hasOwnProperty(key) && !seen[key]) {
+      cells[key].v.textContent = '—';
+      cells[key].unit.textContent = '';
+    }
+}
+
+function init() {
+  tilesEl = document.getElementById('tiles');
+  emptyEl = document.getElementById('empty');
+  getJson('/api/config', function (c) {
+    cfg = c || { visible: [] };
+    if (!cfg.visible) cfg.visible = [];
+    var es = new EventSource('/api/stream');
+    es.onmessage = function (e) {
+      var rows;
+      try { rows = JSON.parse(e.data); } catch (err) { return; }
+      if (!booted) { fullRender(rows); booted = true; }
+      else applyUpdate(rows);
+      document.getElementById('t').textContent = new Date().toLocaleTimeString();
+    };
+    es.onerror = function () { document.getElementById('t').textContent = '重连中…'; };
+    initNotifications(es);
+  });
+}
+init();
+
+// 无 CSS Grid 的旧 WebView → flex 回退
+(function () {
+  var ok = false;
+  try { ok = !!(window.CSS && CSS.supports && CSS.supports('display', 'grid')); } catch (e) { ok = false; }
+  if (!ok) document.documentElement.className += ' no-grid';
+})();
+
+// 常驻显示屏适配：点按全屏 + 屏幕唤醒锁（Fully Kiosk 自身也会做，双保险）
+document.addEventListener('click', function (e) {
+  var t = e.target;
+  while (t && t.id !== 'gear' && t !== document.body) t = t.parentNode;
+  if (t && t.id === 'gear') return; // 点齿轮去设置页，不触发全屏
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    var p = document.documentElement.requestFullscreen(); // 旧 WebView 返回 undefined，无 .catch
+    if (p && p.catch) p.catch(function () {});
+  }
+});
+var wakeLock = null;
+function keepAwake() {
+  try {
+    if (navigator.wakeLock && navigator.wakeLock.request)
+      navigator.wakeLock.request('screen').catch(function () {});
+  } catch (e) { /* 忽略 */ }
+}
+document.addEventListener('visibilitychange', function () { if (!document.hidden) keepAwake(); });
+keepAwake();
+</script>
+</body>
+</html>

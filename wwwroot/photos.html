@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>轮播 · HardwarePanel</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; overflow: hidden; }
+  body { margin: 0; background: #000; }
+  /* 不用 inset 简写（Chrome 87+）：旧 WebView 用四边显式定位 */
+  img { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%;
+        object-fit: contain; background: #000; opacity: 0;
+        -webkit-transition: opacity 1s; transition: opacity 1s; }
+  img.show { opacity: 1; }
+</style>
+</head>
+<body>
+<img id="a" alt="">
+<img id="b" alt="">
+<script src="/notify.js"></script>
+<script>
+// 全 ES5：兼容安卓 5 旧 WebView（XHR + 回调，无 fetch/async/await/箭头/?.）。
+function getJson(url, cb) {
+  var x = new XMLHttpRequest();
+  x.open('GET', url, true);
+  x.onreadystatechange = function () {
+    if (x.readyState === 4) {
+      var data = null;
+      if (x.status === 200) { try { data = JSON.parse(x.responseText); } catch (e) { data = null; } }
+      cb(data);
+    }
+  };
+  x.send(null);
+}
+
+getJson('/api/config', function (cfg) {
+  if (!cfg) cfg = {};
+  getJson('/api/images', function (images) {
+    start(cfg, images || []);
+  });
+});
+
+function start(cfg, images) {
+  var imgs = images, idx = imgs.length ? Math.floor(Math.random() * imgs.length) : 0;
+  var a = document.getElementById('a'), b = document.getElementById('b');
+  var front = a, back = b, timer = null;
+
+  function crossfade() {
+    if (!imgs.length) return;
+    idx = (idx + 1) % imgs.length;
+    back.onload = function () {
+      back.onload = null;
+      back.className = 'show';    // 新图在上层淡入
+      front.className = '';
+      var t = front; front = back; back = t;
+    };
+    back.src = imgs[idx];
+  }
+  function restart() {
+    if (timer) clearInterval(timer);
+    var sec = 10;
+    if (cfg.photos && cfg.photos.intervalSeconds) sec = cfg.photos.intervalSeconds;
+    if (sec < 3) sec = 3;
+    timer = setInterval(crossfade, sec * 1000);
+  }
+
+  if (imgs.length) {
+    front.onload = function () { front.onload = null; front.className = 'show'; };
+    front.src = imgs[idx];
+    restart();
+  }
+  function next() { crossfade(); restart(); } // 点击切下一张并重置计时
+  document.addEventListener('click', next);
+  var sx = null;                               // 滑动切下一张
+  document.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; });
+  document.addEventListener('touchend', function (e) {
+    if (sx !== null && Math.abs(e.changedTouches[0].clientX - sx) > 40) next();
+    sx = null;
+  });
+
+  setInterval(function () { // 图片列表低频刷新（内容很少变化）
+    getJson('/api/images', function (l) { if (l && l.length) imgs = l; });
+  }, 60000);
+
+  var es = new EventSource('/api/stream'); // 不消费 data 帧，只为接收 notify/alarm
+  initNotifications(es);
+
+  function keepAwake() { // 屏幕唤醒锁（Fully Kiosk 双保险）
+    try {
+      if (navigator.wakeLock && navigator.wakeLock.request)
+        navigator.wakeLock.request('screen').catch(function () {});
+    } catch (e) { /* 忽略 */ }
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) keepAwake(); });
+  keepAwake();
+}
+</script>
+</body>
+</html>

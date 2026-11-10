@@ -1,0 +1,115 @@
+<mxfile host="app.diagrams.net" version="24.7.7">
+  <diagram id="hwpanel-arch" name="架构总览">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="pc" value="HardwarePanel.exe（管理员进程 · WinForms 托盘 · 单实例互斥体）" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="620" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="src1" value="LibreHardwareMonitor&#xa;（CPU / 主板 / 内存 · WinRing0）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="70" y="110" width="250" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="src2" value="GpuCounters&#xa;（性能计数器 · Intel 核显伪行）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="70" y="180" width="250" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="main" value="MainForm · Timer 1Hz&#xa;RefreshAll() 采集编排" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="70" y="270" width="250" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="cfg" value="ConfigStore&#xa;config.json 原子读写（tmp+Replace）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="70" y="372" width="250" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="alrm" value="AlarmEngine（ConfigStore.Alarms 单例）&#xa;阈值匹配 + 冷却" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="70" y="474" width="250" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="hub" value="SensorHub" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="360" y="110" width="270" height="490" as="geometry" />
+        </mxCell>
+        <mxCell id="pub" value="Publish&#xa;环形历史 ×300 + _compact" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="378" y="160" width="234" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="http" value="HttpListener :8080&#xa;REST · 静态页 · 图片" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="378" y="226" width="234" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sse" value="SSE 循环 ×N&#xa;（每客户端独立事件队列）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="378" y="292" width="234" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="nfy" value="Notify 广播&#xa;事件帧 + webhook" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="378" y="358" width="234" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="keynote" value="键格式：硬件|传感器|类型&#xa;（配置 visible / 历史 Ring / 页面 keyOf 一致）" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;fillColor=none;strokeColor=#999999;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="378" y="424" width="234" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="lvnote" value="本机 ListView 显示全部行（不随 visible 过滤）&#xa;页面类改动即时生效：按请求读盘 wwwroot" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;fillColor=none;strokeColor=#999999;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="70" y="560" width="550" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="phone" value="手机 · Fully Kiosk Browser（EventSource / XHR）" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="740" y="40" width="400" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="p1" value="/ index.html · 磁贴信息屏（一屏无滚动）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="760" y="90" width="360" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p2" value="/photos.html · 全屏轮播" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="760" y="160" width="360" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p3" value="/settings.html · 配置页（传感器/告警/通知/轮播）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="760" y="230" width="360" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="agent" value="AI Agent / 外部系统" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="760" y="430" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ntfy" value="ntfy.sh&#xa;（webhook）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="980" y="430" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="app" value="手机 ntfy App&#xa;（息屏原生推送）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="860" y="560" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="rows" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="src1" target="main">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="rows" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="src2" target="main">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="Publish(rows) 1Hz" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="main" target="pub">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="Evaluate(cfg, rows)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="main" target="alrm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="命中 → Notify(Title, Body)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="alrm" target="nfy">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="Current（volatile）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="cfg" target="main">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="_dataReady.Set" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="pub" target="sse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="Frames 逐客户端入队" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="nfy" target="sse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="PUT /api/config：Clamp + Save + ResetCooldowns" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="http" target="cfg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="POST /api/notify（token 可选）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="agent" target="http">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="webhook fire-and-forget（5s 超时）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="nfy" target="ntfy">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="推送" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="ntfy" target="app">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="SSE：data 全量/增量 + event" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="sse" target="p1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="SSE：event（不消费 data）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="sse" target="p2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="XHR：GET /api/sensors · PUT /api/config" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="p3" target="http">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

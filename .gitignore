@@ -1,0 +1,18 @@
+# 构建产物
+bin/
+obj/
+
+# 部署 / 打包输出（publish 与分发包均可用 csproj 命令重建）
+publish/
+package/
+
+# 运行时数据（机器本地配置与用户图片）
+config.json
+img/
+*.tmp
+*.old
+
+# IDE / 临时
+.vs/
+*.user
+.vtmp/
