@@ -267,6 +267,8 @@ internal sealed class SensorHub : IDisposable
     private static void Write(HttpListenerContext ctx, string contentType, byte[] body)
     {
         ctx.Response.ContentType = contentType;
+        // 无此头时 WebView/看屏 App 会启发式缓存页面,热更皮肤后屏幕端看不到变化
+        ctx.Response.Headers["Cache-Control"] = "no-cache";
         ctx.Response.ContentLength64 = body.Length;
         ctx.Response.OutputStream.Write(body, 0, body.Length);
         ctx.Response.Close();
