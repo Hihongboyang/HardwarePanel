@@ -76,7 +76,16 @@ internal sealed class MainForm : Form
         };
         _tray.DoubleClick += (_, _) => ShowPanel();
 
-        _computer.Open();
+        try
+        {
+            _computer.Open();
+        }
+        catch (Exception)
+        {
+            // WinRing0 驱动加载失败(常见:被杀毒/驱动签名拦截)→ 不崩溃,托盘给出可诊断提示
+            _tray.ShowBalloonTip(5000, "HardwarePanel",
+                "传感器驱动加载失败：WinRing0 可能被杀毒软件或驱动签名策略拦截", ToolTipIcon.Error);
+        }
         try
         {
             _hub.Start(Port);
@@ -102,6 +111,12 @@ internal sealed class MainForm : Form
     }
 
     private int RefreshAll()
+    {
+        try { return RefreshAllCore(); }
+        catch { return 0; } // 任何一次采集异常都不拖垮托盘主循环;下一拍重试
+    }
+
+    private int RefreshAllCore()
     {
         var rows = new List<SensorRow>();
         var catalog = new List<HwInfoEntry>();
