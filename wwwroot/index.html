@@ -45,7 +45,10 @@
   .brand .bt { display: block; }
   .brand .zh { display: block; font-size: 14px; font-weight: 600; color: #e8ece9; letter-spacing: .06em; }
   .brand .en { display: block; margin-top: 1px; font-size: 8px; line-height: 1; color: #cc2020; letter-spacing: .3em; }
-  .clock { margin-left: auto; display: flex; align-items: center; padding: 3px 10px; font-size: 14px;
+  .plug { flex: none; width: 96px; height: 22px; margin-left: auto;
+          color: rgba(255,80,80,.5); }
+  @media (max-width: 620px) { .plug { display: none; } .clock { margin-left: auto; } }
+  .clock { margin-left: 10px; display: flex; align-items: center; padding: 3px 10px; font-size: 14px;
            color: #ff5050; background: rgba(255,48,48,.05); border: 1px solid rgba(204,32,32,.5);
            font-variant-numeric: tabular-nums; white-space: nowrap; }
   .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
@@ -206,6 +209,28 @@
     <svg class="mark" viewBox="0 0 20 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 1 19 6.5v9L10 21 1 15.5v-9z"/><path d="M10 5 15.8 8.35v6.3L10 18 4.2 14.65v-6.3z" fill="rgba(255,48,48,.4)" stroke="none"/></svg>
     <span class="bt"><span class="zh">硬件监控</span><span class="en">HARDWARE PANEL</span></span>
   </span>
+  <svg class="plug" viewBox="0 0 200 40" aria-hidden="true">
+    <path id="plugL" d="M 4 20 H 58 C 68 -12 68 52 78 20 H 86" stroke="currentColor" stroke-width="3" fill="none"/>
+    <path id="plugR" d="M 196 20 H 142 C 132 -12 132 52 122 20 H 114" stroke="currentColor" stroke-width="3" fill="none"/>
+    <rect id="plugCL" x="88" y="13" width="12" height="14" rx="2" fill="#cc2020" transform="translate(-28,0)"/>
+    <rect id="plugCR" x="100" y="13" width="12" height="14" rx="2" fill="#cc2020" transform="translate(28,0)"/>
+    <animate id="aLout" xlink:href="#plugL" href="#plugL" attributeName="d"
+             from="M 4 20 H 86" to="M 4 20 H 58 C 68 -12 68 52 78 20 H 86" dur="0.25s" begin="indefinite" fill="freeze"/>
+    <animate id="aLin" xlink:href="#plugL" href="#plugL" attributeName="d"
+             from="M 4 20 H 58 C 68 -12 68 52 78 20 H 86" to="M 4 20 H 86" dur="0.25s" begin="indefinite" fill="freeze"/>
+    <animate id="aRout" xlink:href="#plugR" href="#plugR" attributeName="d"
+             from="M 196 20 H 114" to="M 196 20 H 142 C 132 -12 132 52 122 20 H 114" dur="0.25s" begin="indefinite" fill="freeze"/>
+    <animate id="aRin" xlink:href="#plugR" href="#plugR" attributeName="d"
+             from="M 196 20 H 142 C 132 -12 132 52 122 20 H 114" to="M 196 20 H 114" dur="0.25s" begin="indefinite" fill="freeze"/>
+    <animateTransform id="aTLout" xlink:href="#plugCL" href="#plugCL" attributeName="transform" type="translate"
+             from="0 0" to="-28 0" dur="0.25s" begin="indefinite" fill="freeze"/>
+    <animateTransform id="aTLin" xlink:href="#plugCL" href="#plugCL" attributeName="transform" type="translate"
+             from="-28 0" to="0 0" dur="0.25s" begin="indefinite" fill="freeze"/>
+    <animateTransform id="aTRout" xlink:href="#plugCR" href="#plugCR" attributeName="transform" type="translate"
+             from="0 0" to="28 0" dur="0.25s" begin="indefinite" fill="freeze"/>
+    <animateTransform id="aTRin" xlink:href="#plugCR" href="#plugCR" attributeName="transform" type="translate"
+             from="28 0" to="0 0" dur="0.25s" begin="indefinite" fill="freeze"/>
+  </svg>
   <span class="clock"><span class="dot" id="live"></span><span id="clock">--:--:--</span></span>
   <a class="icon-btn" id="photos" href="/photos.html" title="图片轮播">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
@@ -552,6 +577,21 @@ function init() {
   });
 }
 
+/* ---------- 线缆拔插(SMIL):数据流在线=插上,断线=拔开;初始拔开,首帧插上 ---------- */
+var plugged = false;
+function firePlug(dir) {
+  var ids = dir === 'out' ? ['aLout', 'aRout', 'aTLout', 'aTRout']
+                          : ['aLin', 'aRin', 'aTLin', 'aTRin'];
+  for (var i = 0; i < ids.length; i++) {
+    try {
+      var a = document.getElementById(ids[i]);
+      if (a && a.beginElement) a.beginElement();
+    } catch (e) { /* SMIL 不可用:静态姿态,不影响数据 */ }
+  }
+}
+function plugIn() { if (plugged) return; plugged = true; firePlug('in'); }
+function plugOut() { if (!plugged) return; plugged = false; firePlug('out'); }
+
 function startStream() {
   var es = new EventSource('/api/stream');
   es.onmessage = function (e) {
@@ -562,12 +602,14 @@ function startStream() {
       if (!booted) { fullRender(rows); booted = true; }
       else applyUpdate(rows);
     } catch (err2) { /* 渲染异常:下一帧重试 */ }
+    plugIn();
     var now = new Date();
     document.getElementById('clock').textContent =
       p2(now.getHours()) + ':' + p2(now.getMinutes()) + ':' + p2(now.getSeconds());
     document.getElementById('live').className = 'dot';
   };
   es.onerror = function () {
+    plugOut();
     document.getElementById('clock').textContent = '重连中…';
     document.getElementById('live').className = 'dot off';
   };
