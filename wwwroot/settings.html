@@ -11,7 +11,7 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; font: 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif;
          background: #000; color: #e8ece9; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 48px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 48px; position: relative; z-index: 1; }
   .head { position: sticky; top: 0; z-index: 5; display: flex; align-items: center;
           height: 52px; margin: 0 -20px 8px; padding: 0 16px;
           background: #050505; border-bottom: 1px solid #8c1616; }
@@ -35,6 +35,14 @@
           transition: color .15s, border-color .15s; }
   .mini:hover { color: #ff5050; border-color: rgba(204,32,32,.55); }
   .hint { font-size: 12px; line-height: 1.6; color: #6a6e6a; margin: 0 0 8px; }
+  /* 电路原理图背景(与 index 同一元素,红系压暗) */
+  .bgwire { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; pointer-events: none; }
+  .bgwire .nd { fill: rgba(255,48,48,.32);
+                -webkit-animation: wire-blink 3.2s steps(2, end) infinite;
+                animation: wire-blink 3.2s steps(2, end) infinite; }
+  @-webkit-keyframes wire-blink { 50% { opacity: .1; } }
+  @keyframes wire-blink { 50% { opacity: .1; } }
 
   /* 传感器分组卡片 */
   #sensors { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
@@ -116,6 +124,33 @@
 </style>
 </head>
 <body>
+<svg class="bgwire" aria-hidden="true">
+  <defs>
+    <pattern id="wiretile" width="260" height="160" patternUnits="userSpaceOnUse">
+      <g fill="none" stroke="rgba(255,48,48,.05)" stroke-width="1">
+        <path d="M30 28 H150 L172 50 H235"/>
+        <path d="M100 128 H205 L228 105"/>
+        <path d="M40 84 H88 L108 104 H190"/>
+        <path d="M201 30 L205.5 22.2 H214.5 L219 30 L214.5 37.8 H205.5 Z" stroke="rgba(255,48,48,.06)"/>
+      </g>
+      <g fill="rgba(255,48,48,.1)">
+        <rect x="29" y="27" width="3" height="3"/><rect x="234" y="49" width="3" height="3"/>
+        <rect x="99" y="127" width="3" height="3"/><rect x="227" y="104" width="3" height="3"/>
+        <rect x="39" y="83" width="3" height="3"/><rect x="189" y="103" width="3" height="3"/>
+      </g>
+      <path d="M118 128 H134" fill="none" stroke="rgba(255,48,48,.16)" stroke-width="2"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#wiretile)"/>
+  <g class="pins">
+    <rect class="nd" x="12%" y="30%" width="3" height="3" style="animation-delay:0s;-webkit-animation-delay:0s"/>
+    <rect class="nd" x="78%" y="16%" width="3" height="3" style="animation-delay:.6s;-webkit-animation-delay:.6s"/>
+    <rect class="nd" x="88%" y="62%" width="3" height="3" style="animation-delay:1.2s;-webkit-animation-delay:1.2s"/>
+    <rect class="nd" x="20%" y="78%" width="3" height="3" style="animation-delay:1.8s;-webkit-animation-delay:1.8s"/>
+    <rect class="nd" x="55%" y="7%" width="3" height="3" style="animation-delay:2.4s;-webkit-animation-delay:2.4s"/>
+    <rect class="nd" x="44%" y="91%" width="3" height="3" style="animation-delay:.3s;-webkit-animation-delay:.3s"/>
+  </g>
+</svg>
 <div class="wrap">
   <div class="head">
     <a class="icon-btn" href="/" title="返回信息屏">
