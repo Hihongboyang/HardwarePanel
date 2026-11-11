@@ -107,6 +107,11 @@ internal sealed class MainForm : Form
 
         foreach (IHardware hw in _computer.Hardware)
         {
+            // 跳过 Virtual Memory(提交量)组:与物理内存组同名行(Memory/Memory Used)
+            // 会在信息屏出现两个「内存使用率/已用内存」且数值不同,只保留物理内存
+            if (hw.HardwareType == HardwareType.Memory &&
+                hw.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
+                continue;
             Collect(hw, rows);
             foreach (IHardware sub in hw.SubHardware) // 主板 SuperIO 在这里（风扇/电压）
                 Collect(sub, rows, hw.Name);          // 行挂主板名，前端按主板分组
