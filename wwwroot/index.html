@@ -69,35 +69,26 @@
   .hero .chart .thr { stroke: rgba(229,72,77,.45); stroke-width: 1;
                       stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
 
-  /* 右:其余指标。密度阶梯:≤6 统计块;7-12 紧凑单行;>12 紧凑双列 */
+  /* 右:其余指标,统一单行(标签左/数值右);% 行下挂细条;>12 条目时双列 */
   .rows { flex: 1; min-width: 0; display: flex; flex-direction: column;
           justify-content: space-between; margin-left: 16px;
           overflow-y: auto; overflow-x: hidden; }
-  .srow2 { flex: 1; min-height: 0; display: flex; flex-direction: column;
-           justify-content: center; padding: 3px 0; }
+  .srow2 { flex: 1; min-height: 0; display: flex; flex-wrap: wrap;
+           align-items: baseline; padding: 2px 0; }
   .srow2 + .srow2 { border-top: 1px solid rgba(255,255,255,.05); }
-  .srow2 .rvwrap { white-space: nowrap; overflow: hidden; }
-  .srow2 .rv { font-size: 14px; font-size: clamp(13px, 2.1vmin, 21px); color: #e8eaed;
+  .srow2 .rl { flex: 1; min-width: 40%; margin: 0 8px 0 0; font-size: 12px; color: #9aa0a6;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .srow2 .rvwrap { flex: none; white-space: nowrap; }
+  .srow2 .rv { font-size: 14px; font-size: clamp(13px, 2vmin, 20px); color: #e8eaed;
                font-variant-numeric: tabular-nums; transition: color .3s; }
   .srow2 .ru { font-size: 10px; color: #62666c; margin-left: 4px; }
-  .srow2 .rl { font-size: 11px; color: #9aa0a6; margin-top: 1px; white-space: nowrap;
-               overflow: hidden; text-overflow: ellipsis; }
-  .srow2 .bar { flex: none; height: 3px; margin-top: 5px; background: rgba(255,255,255,.08);
+  .srow2 .bar { flex-basis: 100%; height: 2px; margin-top: 3px; background: rgba(255,255,255,.08);
                 border-radius: 2px; position: relative; overflow: hidden; }
   .srow2 .bar b { display: block; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
                   background: #e2a44a; border-radius: 2px;
                   -webkit-transform-origin: 0 50%; transform-origin: 0 50%;
                   -webkit-transform: scaleX(.5); transform: scaleX(.5);
                   -webkit-transition: -webkit-transform .3s; transition: transform .3s; }
-
-  /* 紧凑模式:标签左、数值右一行;% 行下挂 2px 细条 */
-  .rows.compact { justify-content: flex-start; }
-  .rows.compact .srow2 { flex: none; flex-direction: row; flex-wrap: wrap;
-                         align-items: baseline; padding: 2px 0; }
-  .rows.compact .rl { flex: 1; min-width: 40%; margin: 0 8px 0 0; }
-  .rows.compact .rvwrap { flex: none; }
-  .rows.compact .rv { font-size: 13px; font-size: clamp(12px, 1.8vmin, 17px); }
-  .rows.compact .bar { flex-basis: 100%; height: 2px; margin-top: 2px; }
   /* 双列模式(宽面板、条目很多时) */
   .rows.multi { display: block; -webkit-column-count: 2; column-count: 2;
                 -webkit-column-gap: 16px; column-gap: 16px; }
@@ -312,7 +303,7 @@ function fullRender(rows) {
 
     var heroThr = thrOf(hero.raw, hero.type);
     var heroSpark = (hero.type !== 'Data' && hero.type !== 'Level');
-    var rowsCls = rowItems.length > 12 ? 'rows compact multi' : rowItems.length > 6 ? 'rows compact' : 'rows';
+    var rowsCls = rowItems.length > 12 ? 'rows multi' : 'rows';
 
     var el = document.createElement('div');
     el.className = 'panel';
@@ -320,7 +311,7 @@ function fullRender(rows) {
       '</span><span class="n-item">' + (rowItems.length + coreCount) + ' 项</span></div>' +
       '<div class="p-body"><div class="hero">' +
       '<div class="hl">' + esc(cnOf(hero.raw, hero.type)) + '</div>' +
-      '<div class="hvwrap"><span class="hv">—</span><span class="hu">' + esc(hero.unit) + '</span></div>' +
+      '<div class="hvwrap"><span class="hv">—</span><span class="hu">' + esc(hero.raw === 'Uptime' ? '' : hero.unit) + '</span></div>' +
       (heroSpark ? '<svg class="chart" viewBox="0 0 100 16" preserveAspectRatio="none">' +
         (heroThr ? '<line class="thr" x1="0" x2="100" y1="0" y2="0"/>' : '') +
         '<polygon class="fillp" points=""/><polyline class="line" points=""/></svg>' : '') +
@@ -333,7 +324,7 @@ function fullRender(rows) {
     for (var q = 0; q < rowItems.length; q++) {
       var rw = rowItems[q];
       html += '<div class="srow2">' +
-        '<div class="rvwrap"><span class="rv">—</span><span class="ru">' + esc(rw.unit) + '</span></div>' +
+        '<div class="rvwrap"><span class="rv">—</span><span class="ru">' + esc(rw.raw === 'Uptime' ? '' : rw.unit) + '</span></div>' +
         '<div class="rl">' + esc(cnOf(rw.raw, rw.type)) + '</div>' +
         (rw.type === 'Load' ? '<div class="bar"><b></b></div>' : '') + '</div>';
     }

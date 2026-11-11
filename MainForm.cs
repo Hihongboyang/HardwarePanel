@@ -165,6 +165,11 @@ internal sealed class MainForm : Form
                 {
                     unit = "MB";   // 此版本 LHM 的 GPU 显存行为 Data（值即 MB）
                 }
+                else if (s.SensorType == SensorType.Data && hw.HardwareType == HardwareType.Memory)
+                {
+                    v /= 1073741824.0; // 此版本 LHM 内存 Data 原始值为字节 → GB
+                    unit = "GB";
+                }
                 rows.Add(new SensorRow(name, s.Name, s.SensorType.ToString(), Math.Round(v, 2), unit));
             }
             catch { /* 单个传感器异常：继续下一个 */ }
