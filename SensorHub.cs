@@ -172,6 +172,8 @@ internal sealed class SensorHub : IDisposable
             default:
                 if (path.StartsWith("img/"))
                     ServeImage(ctx, path["img/".Length..]);
+                else if (path.StartsWith("nerv-ui/")) // 原版连接器场构建产物(iframe 背景)
+                    ServeAsset(ctx, path["nerv-ui/".Length..]);
                 else
                     NotFound(ctx);
                 break;
@@ -272,6 +274,30 @@ internal sealed class SensorHub : IDisposable
         ctx.Response.ContentLength64 = body.Length;
         ctx.Response.OutputStream.Write(body, 0, body.Length);
         ctx.Response.Close();
+    }
+
+
+    private static readonly Dictionary<string, string> AssetMime = new()
+    {
+        [".html"] = "text/html; charset=utf-8",
+        [".js"] = "application/javascript; charset=utf-8",
+        [".css"] = "text/css; charset=utf-8",
+        [".json"] = "application/json; charset=utf-8",
+        [".ico"] = "image/x-icon",
+        [".png"] = "image/png",
+        [".svg"] = "image/svg+xml",
+        [".txt"] = "text/plain; charset=utf-8",
+    };
+
+    /// <summary>nerv-ui 子树静态资源(原版构建产物);FullPath 双保险防目录穿越。</summary>
+    private static void ServeAsset(HttpListenerContext ctx, string rel)
+    {
+        if (string.IsNullOrEmpty(rel)) rel = "index.html";
+        var baseDir = Path.GetFullPath(Root("wwwroot/nerv-ui"));
+        var full = Path.GetFullPath(Path.Combine(baseDir, rel));
+        if (!full.StartsWith(baseDir) || !File.Exists(full)) { NotFound(ctx); return; }
+        ServeFile(ctx, full,
+            AssetMime.GetValueOrDefault(Path.GetExtension(full).ToLowerInvariant(), "application/octet-stream"));
     }
 
     private static void Write(HttpListenerContext ctx, string contentType, string body) =>
