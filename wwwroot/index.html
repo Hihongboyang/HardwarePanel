@@ -28,18 +28,14 @@
               -webkit-animation: scan-sweep 9s linear infinite; animation: scan-sweep 9s linear infinite; }
   @-webkit-keyframes scan-sweep { from { -webkit-transform: translateY(0); } to { -webkit-transform: translateY(100vh); } }
   @keyframes scan-sweep { from { transform: translateY(0); } to { transform: translateY(100vh); } }
-  /* 电路原理图背景:肘形走线 + 蜂巢 + 闪烁引脚(取自 nerv-ui 示意,红系压暗到 5%) */
-  .bgwire { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 0; pointer-events: none; }
-  .bgwire .nd { fill: rgba(255,48,48,.32);
-                -webkit-animation: wire-blink 3.2s steps(2, end) infinite;
-                animation: wire-blink 3.2s steps(2, end) infinite; }
-  @-webkit-keyframes wire-blink { 50% { opacity: .1; } }
-  @keyframes wire-blink { 50% { opacity: .1; } }
+  /* 背景:原版 nerv-ui(React 构建)以同源 iframe 承载——连接器场 100% 原样运行;
+     整体透明度 0.6:橙场压暗融入黑底,信息面板可读性优先 */
+  .bgframe { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+             z-index: 0; border: 0; pointer-events: none; opacity: .6; }
   header, #panels { position: relative; z-index: 1; }
 
   header { flex: none; display: flex; align-items: center; height: 46px; padding: 0 14px;
-           background: #050505; border-bottom: 1px solid #8c1616; }
+           background: rgba(5,5,5,.6); border-bottom: 1px solid #8c1616; }
   .brand { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
   .brand .mark { flex: none; width: 18px; height: 20px; margin-right: 9px; color: #ff3030; }
   .brand .bt { display: block; }
@@ -75,7 +71,7 @@
   #panels .empty a { color: #ff5050; }
 
   .panel { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0;
-           overflow: hidden; background: #0c0c0e; border: 1px solid rgba(190,35,35,.38);
+           overflow: hidden; background: rgba(12,12,14,.88); border: 1px solid rgba(190,35,35,.38);
            padding: 12px 14px; border-radius: 0; }
   /* EVA 取景框角标 */
   .panel .corner { position: absolute; width: 9px; height: 9px; pointer-events: none; color: #ff3030; }
@@ -177,33 +173,7 @@
 </head>
 <body>
 <div class="scanband"></div>
-<svg class="bgwire" aria-hidden="true">
-  <defs>
-    <pattern id="wiretile" width="260" height="160" patternUnits="userSpaceOnUse">
-      <g fill="none" stroke="rgba(255,48,48,.05)" stroke-width="1">
-        <path d="M30 28 H150 L172 50 H235"/>
-        <path d="M100 128 H205 L228 105"/>
-        <path d="M40 84 H88 L108 104 H190"/>
-        <path d="M201 30 L205.5 22.2 H214.5 L219 30 L214.5 37.8 H205.5 Z" stroke="rgba(255,48,48,.06)"/>
-      </g>
-      <g fill="rgba(255,48,48,.1)">
-        <rect x="29" y="27" width="3" height="3"/><rect x="234" y="49" width="3" height="3"/>
-        <rect x="99" y="127" width="3" height="3"/><rect x="227" y="104" width="3" height="3"/>
-        <rect x="39" y="83" width="3" height="3"/><rect x="189" y="103" width="3" height="3"/>
-      </g>
-      <path d="M118 128 H134" fill="none" stroke="rgba(255,48,48,.16)" stroke-width="2"/>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#wiretile)"/>
-  <g class="pins">
-    <rect class="nd" x="12%" y="30%" width="3" height="3" style="animation-delay:0s;-webkit-animation-delay:0s"/>
-    <rect class="nd" x="78%" y="16%" width="3" height="3" style="animation-delay:.6s;-webkit-animation-delay:.6s"/>
-    <rect class="nd" x="88%" y="62%" width="3" height="3" style="animation-delay:1.2s;-webkit-animation-delay:1.2s"/>
-    <rect class="nd" x="20%" y="78%" width="3" height="3" style="animation-delay:1.8s;-webkit-animation-delay:1.8s"/>
-    <rect class="nd" x="55%" y="7%" width="3" height="3" style="animation-delay:2.4s;-webkit-animation-delay:2.4s"/>
-    <rect class="nd" x="44%" y="91%" width="3" height="3" style="animation-delay:.3s;-webkit-animation-delay:.3s"/>
-  </g>
-</svg>
+<iframe class="bgframe" src="/nerv-ui/" tabindex="-1" scrolling="no" frameborder="0" aria-hidden="true" title="nerv-ui"></iframe>
 <header>
   <span class="brand">
     <svg class="mark" viewBox="0 0 20 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 1 19 6.5v9L10 21 1 15.5v-9z"/><path d="M10 5 15.8 8.35v6.3L10 18 4.2 14.65v-6.3z" fill="rgba(255,48,48,.4)" stroke="none"/></svg>

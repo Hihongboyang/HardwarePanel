@@ -35,18 +35,23 @@
           transition: color .15s, border-color .15s; }
   .mini:hover { color: #ff5050; border-color: rgba(204,32,32,.55); }
   .hint { font-size: 12px; line-height: 1.6; color: #6a6e6a; margin: 0 0 8px; }
-  /* 电路原理图背景(与 index 同一元素,红系压暗) */
-  .bgwire { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 0; pointer-events: none; }
-  .bgwire .nd { fill: rgba(255,48,48,.32);
-                -webkit-animation: wire-blink 3.2s steps(2, end) infinite;
-                animation: wire-blink 3.2s steps(2, end) infinite; }
-  @-webkit-keyframes wire-blink { 50% { opacity: .1; } }
-  @keyframes wire-blink { 50% { opacity: .1; } }
+  /* 背景:原版 nerv-ui(React 构建)以同源 iframe 承载(与 index 同一套),透明度 0.6 */
+  .bgframe { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+             z-index: 0; border: 0; pointer-events: none; opacity: .6; }
+  /* 两列配置区上卡片底(与 .gcard 同语言):表单不再透出背景 */
+  .two-col > div { background: rgba(12,12,14,.9); border: 1px solid rgba(190,35,35,.28);
+                   padding: 16px; }
+  .two-col > div > .sec-head:first-child { margin-top: 0; }
+  .two-col .sec-head { margin-top: 20px; }
+  /* 信息屏面板区:标题行 + 说明也收进暗色卡(与 .gcard 同语言) */
+  .panelbox { background: rgba(12,12,14,.9); border: 1px solid rgba(190,35,35,.28);
+              padding: 12px 16px 4px; margin-bottom: 12px; }
+  .panelbox .sec-head { margin: 0 0 4px; }
+  .panelbox .hint { margin-bottom: 8px; }
 
   /* 传感器分组卡片 */
   #sensors { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
-  .gcard { background: #0c0c0e; border: 1px solid rgba(190,35,35,.28);
+  .gcard { background: rgba(12,12,14,.9); border: 1px solid rgba(190,35,35,.28);
            padding: 4px 14px 6px; min-width: 0; }
   .group-h { display: flex; align-items: baseline; justify-content: space-between;
              margin: 10px 0 2px; font-size: 12px; color: #8a8e8a; }
@@ -124,33 +129,7 @@
 </style>
 </head>
 <body>
-<svg class="bgwire" aria-hidden="true">
-  <defs>
-    <pattern id="wiretile" width="260" height="160" patternUnits="userSpaceOnUse">
-      <g fill="none" stroke="rgba(255,48,48,.05)" stroke-width="1">
-        <path d="M30 28 H150 L172 50 H235"/>
-        <path d="M100 128 H205 L228 105"/>
-        <path d="M40 84 H88 L108 104 H190"/>
-        <path d="M201 30 L205.5 22.2 H214.5 L219 30 L214.5 37.8 H205.5 Z" stroke="rgba(255,48,48,.06)"/>
-      </g>
-      <g fill="rgba(255,48,48,.1)">
-        <rect x="29" y="27" width="3" height="3"/><rect x="234" y="49" width="3" height="3"/>
-        <rect x="99" y="127" width="3" height="3"/><rect x="227" y="104" width="3" height="3"/>
-        <rect x="39" y="83" width="3" height="3"/><rect x="189" y="103" width="3" height="3"/>
-      </g>
-      <path d="M118 128 H134" fill="none" stroke="rgba(255,48,48,.16)" stroke-width="2"/>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#wiretile)"/>
-  <g class="pins">
-    <rect class="nd" x="12%" y="30%" width="3" height="3" style="animation-delay:0s;-webkit-animation-delay:0s"/>
-    <rect class="nd" x="78%" y="16%" width="3" height="3" style="animation-delay:.6s;-webkit-animation-delay:.6s"/>
-    <rect class="nd" x="88%" y="62%" width="3" height="3" style="animation-delay:1.2s;-webkit-animation-delay:1.2s"/>
-    <rect class="nd" x="20%" y="78%" width="3" height="3" style="animation-delay:1.8s;-webkit-animation-delay:1.8s"/>
-    <rect class="nd" x="55%" y="7%" width="3" height="3" style="animation-delay:2.4s;-webkit-animation-delay:2.4s"/>
-    <rect class="nd" x="44%" y="91%" width="3" height="3" style="animation-delay:.3s;-webkit-animation-delay:.3s"/>
-  </g>
-</svg>
+<iframe class="bgframe" src="/nerv-ui/" tabindex="-1" scrolling="no" frameborder="0" aria-hidden="true" title="nerv-ui"></iframe>
 <div class="wrap">
   <div class="head">
     <a class="icon-btn" href="/" title="返回信息屏">
@@ -190,15 +169,17 @@
   </div>
   <button id="saveTop" class="save" type="button">保存</button><span class="msg" id="msgTop"></span>
 
-  <div class="sec-head">
-    <h2>信息屏面板</h2><span class="stag">PANELS</span>
-    <span class="sec-tools">
-      <button class="mini" id="selAll" type="button">全选</button>
-      <button class="mini" id="selNone" type="button">全不选</button>
-      <button class="mini" id="selKeep" type="button">还原</button>
-    </span>
+  <div class="panelbox">
+    <div class="sec-head">
+      <h2>信息屏面板</h2><span class="stag">PANELS</span>
+      <span class="sec-tools">
+        <button class="mini" id="selAll" type="button">全选</button>
+        <button class="mini" id="selNone" type="button">全不选</button>
+        <button class="mini" id="selKeep" type="button">还原</button>
+      </span>
+    </div>
+    <p class="hint">勾选要显示的传感器(按硬件分组)。信息屏固定 4 个面板:处理器 / 显卡 / 内存·主板 / 存储·系统;「CPU Core #N」自动汇成线程负载条;每个面板的第一个温度或负载类传感器作为大字指标并配 5 分钟曲线,其余以数字显示,条目多时自动变紧凑。</p>
   </div>
-  <p class="hint">勾选要显示的传感器(按硬件分组)。信息屏固定 4 个面板:处理器 / 显卡 / 内存·主板 / 存储·系统;「CPU Core #N」自动汇成线程负载条;每个面板的第一个温度或负载类传感器作为大字指标并配 5 分钟曲线,其余以数字显示,条目多时自动变紧凑。</p>
   <div id="sensors"><p class="hint">加载中…</p></div>
 
   <button id="saveBottom" class="save" type="button">保存</button><span class="msg" id="msgBottom"></span>
