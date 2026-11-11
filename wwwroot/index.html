@@ -5,65 +5,481 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HardwarePanel</title>
 <style>
+  /* 全 ES5 兼容:无 CSS 变量/inset/flex-gap;clamp() 前写像素回退;grid 有 flex 回退 */
   :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; overflow: hidden; }
   body { margin: 0; display: flex; flex-direction: column;
-         font: 14px/1.4 system-ui, sans-serif; background: #111; color: #ddd;
-         -webkit-tap-highlight-color: transparent; user-select: none; }
-  header { flex: none; display: flex; align-items: center; height: 32px;
-           padding: 0 10px; background: #161616; border-bottom: 1px solid #222; }
-  header h1 { font-size: 14px; margin: 0; font-weight: 600; white-space: nowrap; }
-  #t { color: #555; font-size: 11px; margin-left: 8px; font-weight: normal; }
-  #gear { margin-left: auto; color: #8ab4f8; font-size: 18px; text-decoration: none; line-height: 1; }
-  #tiles { flex: 1; display: grid; min-height: 0; padding: 10px; gap: 10px;
-           grid-auto-rows: minmax(0, 1fr);
-           grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
-  .tile { display: flex; flex-direction: column; min-height: 0; overflow: hidden;
-          background: #181818; border: 1px solid #262626; border-radius: 10px; padding: 8px 10px;
-          box-sizing: border-box; }
-  .tile .label { font-size: 13px; font-size: clamp(11px, 2vmin, 16px); color: #999;
-                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tile .val { font-size: 24px; font-size: clamp(16px, 5vmin, 42px); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .tile .unit { font-size: 12px; font-size: clamp(10px, 1.6vmin, 14px); color: #777; margin-left: 4px; }
-  .tile svg { flex: 1; min-height: 0; width: 100%; }
-  .tile svg polyline { fill: none; stroke: #8ab4f8; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-  /* 旧 WebView 无 CSS Grid（<57）时的 flex 回退：磁贴照常铺排，允许滚动 */
-  .no-grid #tiles { display: flex; flex-wrap: wrap; align-content: flex-start; overflow-y: auto; }
-  .no-grid .tile { flex: 1 1 140px; min-height: 64px; margin: 0 10px 10px 0; }
-  #empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #777; }
-  #empty[hidden] { display: none; }
-  #empty a { color: #8ab4f8; }
+         font: 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif;
+         background: #0e0f11; color: #e8eaed;
+         -webkit-user-select: none; user-select: none; }
+  .mono, .clock, .hv, .rv { font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
+
+  header { flex: none; display: flex; align-items: center; height: 44px; padding: 0 16px;
+           border-bottom: 1px solid rgba(255,255,255,.07); }
+  .brand { font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .clock { margin-left: auto; font-size: 13px; color: #9aa0a6;
+           font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+         background: #e2a44a; margin-right: 10px; vertical-align: 1px; }
+  .dot.off { background: #62666c; }
+  .icon-btn { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+              margin-left: 8px; color: #9aa0a6; background: none; border: none; border-radius: 8px;
+              cursor: pointer; transition: color .15s, background-color .15s; }
+  .icon-btn:hover { color: #e8eaed; background: #1c1e22; }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  /* 面板网格:固定 2×2(空面板自动隐藏),竖屏 1 列 */
+  #panels { flex: 1; min-height: 0; width: 100%; max-width: 1280px; margin: 0 auto;
+            padding: 12px; display: grid; gap: 12px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-auto-rows: minmax(0, 1fr); }
+  @media (max-width: 560px) {
+    #panels { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+    .panel { min-height: 132px; }
+  }
+  #panels .empty { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 10px; color: #62666c; }
+  #panels .empty a { color: #e2a44a; }
+
+  .panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
+           background: #15171a; border: 1px solid rgba(255,255,255,.07); border-radius: 14px;
+           padding: 12px 14px; }
+  .p-head { flex: none; display: flex; align-items: center; }
+  .p-head svg { flex: none; width: 16px; height: 16px; color: #62666c; margin-right: 8px; }
+  .p-head .nm { font-size: 13px; font-weight: 600; color: #9aa0a6;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-head .n-item { margin-left: auto; padding-left: 12px; font-size: 11px; color: #62666c;
+                    font-variant-numeric: tabular-nums; }
+  .p-body { flex: 1; min-height: 0; display: flex; margin-top: 8px; }
+
+  /* 左:该面板的关键指标(唯一的曲线) */
+  .hero { display: flex; flex-direction: column; width: 42%; min-width: 0; }
+  .hero .hl { font-size: 11px; color: #62666c; white-space: nowrap;
+              overflow: hidden; text-overflow: ellipsis; }
+  .hero .hv { margin-top: 2px; font-size: 22px; font-size: clamp(18px, 3.8vmin, 42px);
+              line-height: 1.05; color: #e8eaed; font-variant-numeric: tabular-nums;
+              white-space: nowrap; transition: color .3s; }
+  .hero .hu { font-size: 11px; font-size: clamp(10px, 1.3vmin, 13px); color: #62666c;
+              margin-left: 4px; font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .hero .chart { flex: 1; min-height: 0; width: 100%; margin-top: 6px; }
+  .hero .chart .line { fill: none; stroke: #e2a44a; stroke-width: 1.5;
+                       vector-effect: non-scaling-stroke; opacity: .9; transition: stroke .3s; }
+  .hero .chart .fillp { fill: rgba(226,164,74,.12); stroke: none; }
+  .hero .chart .thr { stroke: rgba(229,72,77,.45); stroke-width: 1;
+                      stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+
+  /* 右:其余指标。密度阶梯:≤6 统计块;7-12 紧凑单行;>12 紧凑双列 */
+  .rows { flex: 1; min-width: 0; display: flex; flex-direction: column;
+          justify-content: space-between; margin-left: 16px;
+          overflow-y: auto; overflow-x: hidden; }
+  .srow2 { flex: 1; min-height: 0; display: flex; flex-direction: column;
+           justify-content: center; padding: 3px 0; }
+  .srow2 + .srow2 { border-top: 1px solid rgba(255,255,255,.05); }
+  .srow2 .rvwrap { white-space: nowrap; overflow: hidden; }
+  .srow2 .rv { font-size: 14px; font-size: clamp(13px, 2.1vmin, 21px); color: #e8eaed;
+               font-variant-numeric: tabular-nums; transition: color .3s; }
+  .srow2 .ru { font-size: 10px; color: #62666c; margin-left: 4px; }
+  .srow2 .rl { font-size: 11px; color: #9aa0a6; margin-top: 1px; white-space: nowrap;
+               overflow: hidden; text-overflow: ellipsis; }
+  .srow2 .bar { flex: none; height: 3px; margin-top: 5px; background: rgba(255,255,255,.08);
+                border-radius: 2px; position: relative; overflow: hidden; }
+  .srow2 .bar b { display: block; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+                  background: #e2a44a; border-radius: 2px;
+                  -webkit-transform-origin: 0 50%; transform-origin: 0 50%;
+                  -webkit-transform: scaleX(.5); transform: scaleX(.5);
+                  -webkit-transition: -webkit-transform .3s; transition: transform .3s; }
+
+  /* 紧凑模式:标签左、数值右一行;% 行下挂 2px 细条 */
+  .rows.compact { justify-content: flex-start; }
+  .rows.compact .srow2 { flex: none; flex-direction: row; flex-wrap: wrap;
+                         align-items: baseline; padding: 2px 0; }
+  .rows.compact .rl { flex: 1; min-width: 40%; margin: 0 8px 0 0; }
+  .rows.compact .rvwrap { flex: none; }
+  .rows.compact .rv { font-size: 13px; font-size: clamp(12px, 1.8vmin, 17px); }
+  .rows.compact .bar { flex-basis: 100%; height: 2px; margin-top: 2px; }
+  /* 双列模式(宽面板、条目很多时) */
+  .rows.multi { display: block; -webkit-column-count: 2; column-count: 2;
+                -webkit-column-gap: 16px; column-gap: 16px; }
+  .rows.multi .srow2 { -webkit-column-break-inside: avoid; break-inside: avoid; }
+
+  /* 线程负载微条(transform 缩放,不动画布局属性) */
+  .cores-cap { flex: none; font-size: 11px; color: #62666c; margin-bottom: 4px; }
+  .cores { flex: none; display: flex; height: 22px; margin-bottom: 8px; }
+  .cores i { display: block; position: relative; flex: 1; min-width: 0; height: 100%;
+             margin-right: 3px; background: rgba(255,255,255,.07); border-radius: 2px; }
+  .cores i:last-child { margin-right: 0; }
+  .cores i b { display: block; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+               background: #e2a44a; border-radius: 2px;
+               -webkit-transform-origin: 50% 100%; transform-origin: 50% 100%;
+               -webkit-transform: scaleY(.4); transform: scaleY(.4);
+               -webkit-transition: -webkit-transform .3s; transition: transform .3s; }
+
+  /* 阈值热区:进入阈值九成区间琥珀,越线红(数值与曲线同步) */
+  .hero.warm .hv { color: #e2a44a; }
+  .hero.hot .hv { color: #e5484d; }
+  .hero.warm .chart .line { stroke: #e2a44a; }
+  .hero.warm .chart .fillp { fill: rgba(226,164,74,.14); }
+  .hero.hot .chart .line { stroke: #e5484d; opacity: 1; }
+  .hero.hot .chart .fillp { fill: rgba(229,72,77,.16); }
+  .srow2.warm .rv { color: #e2a44a; }
+  .srow2.hot .rv { color: #e5484d; }
+  .panel.hot { border-color: rgba(229,72,77,.4); }
+
+  /* 旧 WebView 无 CSS Grid 时 flex 回退:面板照常铺排,允许滚动 */
+  .no-grid #panels { display: flex; flex-wrap: wrap; align-content: flex-start; overflow-y: auto; }
+  .no-grid .panel { flex: 1 1 320px; min-height: 140px; margin: 0 12px 12px 0; }
 </style>
 </head>
 <body>
 <header>
-  <h1>硬件监控<span id="t"></span></h1>
-  <a id="gear" href="/settings.html" title="设置">⚙</a>
+  <span class="brand">硬件监控</span>
+  <span class="clock"><span class="dot" id="live"></span><span id="clock">--:--:--</span></span>
+  <a class="icon-btn" id="gear" href="/settings.html" title="设置">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>
+  </a>
 </header>
-<div id="tiles"></div>
-<div id="empty" hidden>
-  未选择任何传感器
-  <a href="/settings.html">前往设置页选择</a>
-</div>
+<div id="panels"><div class="empty" id="boot">连接中…</div></div>
 <script src="/notify.js"></script>
 <script>
-// 全 ES5：兼容安卓 5 旧 WebView（无 fetch/箭头函数/模板串/let/??/?./Map/Set）。
-var UNITS = { Temperature: '°C', Load: '%', Power: 'W', Fan: 'RPM', Data: 'GB', Clock: 'MHz', Voltage: 'V', Current: 'A' };
-var SPARK_NAMES = ['CPU Total', 'CPU Package', 'Core Average', 'Memory', '总使用率'];
-var HIST_LEN = 300;
+// 全 ES5:兼容安卓 5 旧 WebView(无 fetch/箭头/模板串/let/??/?./Map/Set/closest)。
+// 面板式信息屏:按硬件分组固定 4 面板;hero=面板唯一曲线;密度阶梯;阈值热区(cfg.alarms)。
+// 容错原则:任何一帧、任何一项出错只影响该项显示「—」,不影响其余硬件继续渲染。
 
-var hist = {};   // key -> number[]（本地滚动历史，用于总值曲线）
-var cells = {};  // key -> { v, unit, line, sensor }
-var cfg = null, booted = false;
+var HIST_LEN = 300;
+var cfg = null;        // /api/config:visible + alarms
+var booted = false;
+var cells = {};        // key -> 单元引用与元数据
+var hist = {};         // key -> number[](hero 曲线)
+var coreRefs = [];     // 每面板线程条引用
+
+/* ---------- 中文名(键: 原始名|类型;查不到显示原名) ---------- */
+var CN2 = {
+  // 处理器(AMD / Intel)
+  'Core (Tctl/Tdie)|Temperature': '封装温度', 'CPU Package|Temperature': '封装温度',
+  'CCD1 (Tdie)|Temperature': 'CCD 温度', 'Core Average|Temperature': '平均核温',
+  'CPU Total|Load': '总负载', 'CPU Core Max|Load': '最大核负载',
+  'CPU Package|Power': '封装功耗', 'Package|Power': '封装功耗', 'Package Power|Power': '封装功耗',
+  'Cores (Average)|Clock': '平均频率', 'Bus Speed|Clock': '总线频率',
+  'Core (SVI2 TFN)|Voltage': '核心电压', 'SoC (SVI2 TFN)|Voltage': 'SoC 电压',
+  // 主板(SuperIO)
+  'CPU Fan|Fan': 'CPU 风扇', 'System Fan #1|Fan': '系统风扇 1', 'System Fan #2|Fan': '系统风扇 2',
+  'System Fan #3|Fan': '系统风扇 3', 'Pump Fan|Fan': '水泵风扇',
+  'CPU|Temperature': 'CPU 温度', 'System|Temperature': '系统温度', 'Motherboard|Temperature': '主板温度',
+  'VRM MOS|Temperature': '供电 VRM', 'MOS|Temperature': '供电 MOS', 'PCH|Temperature': '芯片组',
+  'Chipset|Temperature': '芯片组', 'CPU Socket|Temperature': 'CPU 插座', 'M2 #1|Temperature': 'M.2 插槽',
+  'Vcore|Voltage': 'Vcore', '+12V|Voltage': '+12V', '+5V|Voltage': '+5V', '+3.3V|Voltage': '+3.3V',
+  'DIMM|Voltage': '内存电压', 'CMOS Battery|Voltage': '主板电池', 'VBAT|Voltage': '主板电池',
+  // 显卡
+  'GPU Core|Temperature': '核心温度', 'GPU Hot Spot|Temperature': '热点',
+  'GPU Memory Junction|Temperature': '显存温度', 'GPU Memory|Temperature': '显存温度',
+  'GPU Core|Load': '使用率', 'GPU Memory|Load': '显存占用率',
+  'GPU Memory Controller|Load': '显存控制器', 'GPU Video Engine|Load': '视频引擎',
+  'D3D 3D|Load': '3D 引擎', 'GPU Core|Clock': '核心频率', 'GPU Memory|Clock': '显存频率',
+  'GPU Fan 1|Fan': '风扇', 'GPU Fan 2|Fan': '风扇 2',
+  'GPU Package|Power': '功耗', 'GPU Power|Power': '功耗', 'GPU Board Power|Power': '整板功耗',
+  'GPU Memory Used|Data': '显存占用', 'GPU Memory Free|Data': '显存空闲', 'GPU Memory Total|Data': '显存总量',
+  // 内存
+  'Memory|Load': '内存使用率', 'Memory Used|Data': '已用内存', 'Memory Available|Data': '可用内存',
+  // 存储
+  'Composite Temperature|Temperature': '温度', 'Temperature|Temperature': '温度',
+  'Temperature #1|Temperature': '温度 1', 'Temperature #2|Temperature': '温度 2',
+  'Read Rate|Throughput': '读取', 'Write Rate|Throughput': '写入',
+  'Used Space|Load': '已用空间', 'Free Space|Data': '剩余空间', 'Total Space|Data': '总空间',
+  'Life|Level': '寿命', 'Data Read|Data': '累计读取', 'Data Written|Data': '累计写入',
+  // 网卡
+  'Download Speed|Throughput': '下行', 'Upload Speed|Throughput': '上行',
+  'Network Utilization|Load': '网络使用率',
+  // 系统(伪行)
+  'Uptime|Data': '运行时间', 'Volume|Load': '主音量'
+};
+function cnOf(raw, type) { return CN2[raw + '|' + type] || raw; }
+
+/* ---------- 面板归属(未知硬件并入存储·系统,保证总能渲染) ---------- */
+var PANEL_DEFS = [
+  { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>', name: '处理器' },
+  { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>', name: '显卡' },
+  { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 19v-3"/><path d="M10 19v-3"/><path d="M14 19v-3"/><path d="M18 19v-3"/><path d="M8 11V9"/><path d="M16 11V9"/><path d="M12 11V9"/><path d="M2 15h20"/><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></svg>', name: '内存 · 主板' },
+  { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/></svg>', name: '存储 · 系统' }
+];
+function panelOf(hw) {
+  var s = hw.toLowerCase();
+  if (/ryzen|intel core|xeon|athlon|epyc|core i[3579]|\bcpu\b/.test(s)) return 0;
+  if (/nvidia|radeon|\barc\b|gpu|显卡/.test(s)) return 1;
+  if (/memory|内存/.test(s)) return 2;
+  if (/motherboard|msi|asus|gigabyte|asrock|biostar|dell|lenovo|\bhp\b|supermicro|nuvoton|\bite\b|fintek|nct\d|主板/.test(s)) return 2;
+  return 3; // 磁盘 / 网卡 / 系统 / 未知硬件
+}
+
+/* ---------- 告警规则匹配(与后端 AlarmEngine 同语义) ---------- */
+function thrOf(raw, type) {
+  if (!cfg || !cfg.alarms) return 0;
+  var ls = String(raw).toLowerCase(), i;
+  for (i = 0; i < cfg.alarms.length; i++) {
+    var a = cfg.alarms[i];
+    if (!a.match || ls.indexOf(String(a.match).toLowerCase()) === -1) continue;
+    if (a.type && a.type !== type) continue;
+    return a.value;
+  }
+  return 0;
+}
+
+/* ---------- 数值格式 ---------- */
+function p2(n) { return (n < 10 ? '0' : '') + n; }
+function fmt(v, unit, raw) {
+  if (v === null || v === undefined) return '—';
+  if (raw === 'Uptime') {
+    var s = Math.floor(v), d = Math.floor(s / 86400); s -= d * 86400;
+    return d + '天' + p2(Math.floor(s / 3600)) + ':' + p2(Math.floor((s % 3600) / 60)) + ':' + p2(s % 60);
+  }
+  var x;
+  if (unit === 'V') x = v.toFixed(2);
+  else if (unit === 'W' || unit === 'GB') x = v.toFixed(1);
+  else if (unit === 'MB/s') x = v < 10 ? v.toFixed(2) : v.toFixed(1);
+  else x = String(Math.round(v));
+  if (Math.abs(v) >= 10000) x = Number(x).toLocaleString();
+  return x;
+}
+
+/* ---------- 曲线几何(viewBox 100×16) ---------- */
+function points(h, thr) {
+  var min = Infinity, max = -Infinity, i;
+  for (i = 0; i < h.length; i++) { if (h[i] < min) min = h[i]; if (h[i] > max) max = h[i]; }
+  if (thr) { if (thr > max) max = thr; if (thr < min - 2) min = thr - 2; }
+  var span = (max - min) || 1, out = [], thrY = null;
+  for (i = 0; i < h.length; i++)
+    out.push((i / (h.length - 1) * 100).toFixed(1) + ',' + (15 - (h[i] - min) / span * 13).toFixed(1));
+  if (thr && thr <= max && thr >= min) thrY = (15 - (thr - min) / span * 13).toFixed(1);
+  return { line: out.join(' '), thrY: thrY };
+}
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   });
 }
-function keyOf(r) { return r.hardware + '|' + r.sensor + '|' + r.type; }
-function isSpark(name) { return SPARK_NAMES.indexOf(name) !== -1; }
 
+var panelsEl;
+
+/* ---------- 全量帧:按 cfg.visible 顺序建面板(逐面板 createElement,引用即时绑定) ---------- */
+function fullRender(rows) {
+  var byKey = {}, i, r;
+  for (i = 0; i < rows.length; i++) { r = rows[i]; byKey[r.hardware + '|' + r.sensor + '|' + r.type] = r; }
+
+  var sel = [[], [], [], []];
+  var visible = (cfg && cfg.visible) ? cfg.visible : [];
+  for (i = 0; i < visible.length; i++) {
+    var key = visible[i], row = byKey[key];
+    var parts = key.split('|');                 // 传感器消失:仍按键占位,显示「—」
+    var hw = row ? row.hardware : (parts[0] || '');
+    var raw = row ? row.sensor : (parts[1] || '');
+    var type = row ? row.type : (parts[2] || '');
+    var pi = (raw === 'Uptime') ? 0 : panelOf(hw); // 运行时间钉在处理器面板
+    sel[pi].push({ key: key, raw: raw, type: type,
+                   unit: row ? row.unit : '', history: row ? row.history : null });
+  }
+
+  cells = {}; hist = {}; coreRefs = [];
+  panelsEl.innerHTML = '';
+  var used = 0;
+
+  for (i = 0; i < 4; i++) {
+    var items = sel[i];
+    if (!items.length) continue;
+
+    // 线程负载汇成微条;运行时间排到面板末尾
+    var coreCount = 0, rest = [], tail = [], k;
+    for (k = 0; k < items.length; k++) {
+      var it = items[k];
+      var isCore = it.type === 'Load' &&
+        (/^CPU Core #\d+$/.test(it.raw) || /^Core #\d+$/.test(it.raw));
+      if (isCore) coreCount++;
+      else if (it.raw === 'Uptime') tail.push(it);
+      else rest.push(it);
+    }
+    rest = rest.concat(tail);
+
+    // hero:优先带告警阈值的指标(热区可见),否则第一个温度,否则第一个负载
+    var hero = null;
+    for (k = 0; k < rest.length; k++) if (thrOf(rest[k].raw, rest[k].type)) { hero = rest[k]; break; }
+    if (!hero) for (k = 0; k < rest.length; k++) if (rest[k].type === 'Temperature') { hero = rest[k]; break; }
+    if (!hero) for (k = 0; k < rest.length; k++) if (rest[k].type === 'Load') { hero = rest[k]; break; }
+    var rowItems = [];
+    for (k = 0; k < rest.length; k++) if (rest[k] !== hero) rowItems.push(rest[k]);
+    if (!hero && rowItems.length) hero = rowItems.shift();
+    if (!hero) continue;
+    used++;
+
+    var heroThr = thrOf(hero.raw, hero.type);
+    var heroSpark = (hero.type !== 'Data' && hero.type !== 'Level');
+    var rowsCls = rowItems.length > 12 ? 'rows compact multi' : rowItems.length > 6 ? 'rows compact' : 'rows';
+
+    var el = document.createElement('div');
+    el.className = 'panel';
+    var html = '<div class="p-head">' + PANEL_DEFS[i].icon + '<span class="nm">' + esc(PANEL_DEFS[i].name) +
+      '</span><span class="n-item">' + (rowItems.length + coreCount) + ' 项</span></div>' +
+      '<div class="p-body"><div class="hero">' +
+      '<div class="hl">' + esc(cnOf(hero.raw, hero.type)) + '</div>' +
+      '<div class="hvwrap"><span class="hv">—</span><span class="hu">' + esc(hero.unit) + '</span></div>' +
+      (heroSpark ? '<svg class="chart" viewBox="0 0 100 16" preserveAspectRatio="none">' +
+        (heroThr ? '<line class="thr" x1="0" x2="100" y1="0" y2="0"/>' : '') +
+        '<polygon class="fillp" points=""/><polyline class="line" points=""/></svg>' : '') +
+      '</div><div class="' + rowsCls + '">';
+    if (coreCount) {
+      html += '<div class="cores-cap">线程负载 ×' + coreCount + '</div><div class="cores">';
+      for (var c = 0; c < coreCount; c++) html += '<i><b></b></i>';
+      html += '</div>';
+    }
+    for (var q = 0; q < rowItems.length; q++) {
+      var rw = rowItems[q];
+      html += '<div class="srow2">' +
+        '<div class="rvwrap"><span class="rv">—</span><span class="ru">' + esc(rw.unit) + '</span></div>' +
+        '<div class="rl">' + esc(cnOf(rw.raw, rw.type)) + '</div>' +
+        (rw.type === 'Load' ? '<div class="bar"><b></b></div>' : '') + '</div>';
+    }
+    html += '</div></div>';
+    el.innerHTML = html;
+    panelsEl.appendChild(el);
+
+    // hero 引用(先取 .hero 容器,再在其内部查询,避免面板头角标占位)
+    var heroEl = el.getElementsByTagName('div')[2];
+    cells[hero.key] = {
+      hero: true, panel: el, block: heroEl,
+      v: heroEl.getElementsByTagName('span')[0], unit: hero.unit,
+      raw: hero.raw, type: hero.type, thr: heroThr,
+      line: el.getElementsByTagName('polyline')[0] || null,
+      fill: el.getElementsByTagName('polygon')[0] || null,
+      thrLine: (function (node) { // 磁盘等图标内也有 <line>,按 class 精确取阈值线
+        var ls = node.getElementsByTagName('line'), j;
+        for (j = 0; j < ls.length; j++) if (ls[j].getAttribute('class') === 'thr') return ls[j];
+        return null;
+      })(el),
+      bar: null
+    };
+    hist[hero.key] = (hero.history && hero.history.length) ? hero.history : [];
+
+    // 行引用(按序对位)
+    var blocks = el.getElementsByTagName('div'), rowEls = [], m;
+    for (m = 0; m < blocks.length; m++) if (blocks[m].className === 'srow2') rowEls.push(blocks[m]);
+    for (k = 0; k < rowEls.length && k < rowItems.length; k++) {
+      var item = rowItems[k], rEl = rowEls[k];
+      cells[item.key] = {
+        hero: false, panel: el, block: rEl,
+        v: rEl.getElementsByTagName('span')[0], unit: item.unit,
+        raw: item.raw, type: item.type, thr: thrOf(item.raw, item.type),
+        line: null, fill: null, thrLine: null,
+        bar: rEl.getElementsByTagName('b')[0] || null
+      };
+    }
+
+    // 线程条引用(增量帧按线程负载键推进:CPU Core #N / Core #N)
+    if (coreCount) {
+      var coresEl = null, divs = el.getElementsByTagName('div');
+      for (k = 0; k < divs.length; k++) if (divs[k].className === 'cores') { coresEl = divs[k]; break; }
+      if (coresEl) coreRefs.push({ bars: coresEl.getElementsByTagName('b'), panel: i });
+    }
+  }
+
+  if (!used)
+    panelsEl.innerHTML = '<div class="empty">未选择任何传感器<br><a href="/settings.html">前往设置页选择</a></div>';
+
+  // 全量帧数据一并灌入
+  for (i = 0; i < rows.length; i++) setVal(rows[i]);
+  updateCores(rows);
+}
+
+/* ---------- 单项更新(所有异常吞掉,只影响该项) ---------- */
+function setVal(r) {
+  try {
+    var key = r.hardware + '|' + r.sensor + '|' + r.type;
+    var c = cells[key];
+    if (!c) return;
+    var has = r.value !== null && r.value !== undefined;
+    c.v.textContent = has ? fmt(r.value, c.unit || r.unit, c.raw) : '—';
+    var state = '';
+    if (c.thr && has) {
+      if (r.value >= c.thr) state = 'hot';
+      else if (r.value >= c.thr * 0.9) state = 'warm';
+    }
+    c.block.className = c.block.className.replace(/ *warm| *hot/g, '') + (state ? ' ' + state : '');
+    if (c.hero) c.panel.className = 'panel' + (state === 'hot' ? ' hot' : '');
+    if (c.bar) {
+      var x = has ? Math.max(0, Math.min(100, r.value)) / 100 : 0;
+      c.bar.style.webkitTransform = 'scaleX(' + x.toFixed(3) + ')';
+      c.bar.style.transform = 'scaleX(' + x.toFixed(3) + ')';
+    }
+    if (c.hero && c.line && has) {
+      if (r.history && r.history.length) hist[key] = r.history;
+      else {
+        if (!hist[key]) hist[key] = [];
+        hist[key].push(r.value);
+        if (hist[key].length > HIST_LEN) hist[key].shift();
+      }
+      var h = hist[key];
+      if (h && h.length > 1) {
+        var pt = points(h, c.thr || null);
+        c.line.setAttribute('points', pt.line);
+        if (c.fill) c.fill.setAttribute('points', '0,16 ' + pt.line + ' 100,16');
+        if (c.thrLine) {
+          if (pt.thrY !== null) {
+            c.thrLine.setAttribute('y1', pt.thrY); c.thrLine.setAttribute('y2', pt.thrY);
+            c.thrLine.setAttribute('opacity', '1');
+          } else c.thrLine.setAttribute('opacity', '0');
+        }
+      }
+    }
+  } catch (e) { /* 单项失败:保持「—」 */ }
+}
+
+/* ---------- 线程条:同面板线程负载键按序映射到微条 ---------- */
+function updateCores(rows) {
+  try {
+    var i, k;
+    for (i = 0; i < coreRefs.length; i++) {
+      var ref = coreRefs[i], n = ref.bars.length;
+      var vals = [];
+      for (k = 0; k < rows.length; k++) {
+        var r = rows[k];
+        if (r.type !== 'Load') continue;
+        if (!(/^CPU Core #\d+$/.test(r.sensor) || /^Core #\d+$/.test(r.sensor))) continue;
+        var pi = panelOf(r.hardware);
+        if (pi !== ref.panel) continue;
+        var idx = parseInt(r.sensor.replace(/[^0-9]/g, ''), 10) || (vals.length + 1);
+        vals[idx - 1] = r.value;
+      }
+      for (k = 0; k < n && k < vals.length; k++) {
+        var v = vals[k];
+        var y = (v === null || v === undefined) ? 0 : Math.max(0, Math.min(100, v)) / 100;
+        ref.bars[k].style.webkitTransform = 'scaleY(' + y.toFixed(3) + ')';
+        ref.bars[k].style.transform = 'scaleY(' + y.toFixed(3) + ')';
+      }
+    }
+  } catch (e) { /* 线程条失败不影响数值 */ }
+}
+
+/* ---------- 增量帧:只更新已有单元;缺失键回退「—」 ---------- */
+function applyUpdate(rows) {
+  var seen = {}, i, key;
+  for (i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    key = r.hardware + '|' + r.sensor + '|' + r.type;
+    seen[key] = true;
+    setVal(r);
+  }
+  for (key in cells)
+    if (cells.hasOwnProperty(key) && !seen[key]) {
+      try {
+        cells[key].v.textContent = '—';
+        if (cells[key].bar) {
+          cells[key].bar.style.webkitTransform = 'scaleX(0)';
+          cells[key].bar.style.transform = 'scaleX(0)';
+        }
+      } catch (e) { /* 忽略单项 */ }
+    }
+  updateCores(rows);
+}
+
+/* ---------- 启动:SSE 全量首帧 + 每秒增量 + notify/alarm 事件 ---------- */
 function getJson(url, cb) {
   var x = new XMLHttpRequest();
   x.open('GET', url, true);
@@ -77,105 +493,30 @@ function getJson(url, cb) {
   x.send(null);
 }
 
-function points(h) {
-  var min = Infinity, max = -Infinity, i;
-  for (i = 0; i < h.length; i++) { if (h[i] < min) min = h[i]; if (h[i] > max) max = h[i]; }
-  var span = (max - min) || 1, out = [];
-  for (i = 0; i < h.length; i++)
-    out.push((i / (h.length - 1) * 100).toFixed(1) + ',' + (15 - (h[i] - min) / span * 13).toFixed(1));
-  return out.join(' ');
-}
-
-var tilesEl, emptyEl;
-
-// 全量渲染：按 cfg.visible 顺序建磁贴；数据里没有的键显示 — 占位
-function fullRender(rows) {
-  var byKey = {}, i, r;
-  for (i = 0; i < rows.length; i++) { r = rows[i]; byKey[keyOf(r)] = r; }
-  tilesEl.innerHTML = '';
-  cells = {};
-  var hasVisible = cfg && cfg.visible && cfg.visible.length > 0;
-  emptyEl.hidden = !!hasVisible;
-  tilesEl.style.display = hasVisible ? '' : 'none';
-  if (!hasVisible) return;
-  for (i = 0; i < cfg.visible.length; i++) {
-    var key = cfg.visible[i];
-    r = byKey[key];
-    var label = r ? r.sensor : key.split('|')[1];
-    var tile = document.createElement('div');
-    tile.className = 'tile';
-    tile.innerHTML =
-      '<div class="label">' + esc(label) + '</div>' +
-      '<div class="val"><span class="v">—</span><span class="unit"></span></div>' +
-      (r && isSpark(r.sensor)
-        ? '<svg viewBox="0 0 100 16" preserveAspectRatio="none"><polyline points=""/></svg>'
-        : '');
-    tilesEl.appendChild(tile);
-    cells[key] = {
-      v: tileGet(tile, '.v'),
-      unit: tileGet(tile, '.unit'),
-      line: tileGet(tile, 'polyline'),
-      sensor: label
-    };
-    if (r) {
-      hist[key] = r.history || [];
-      setVal(key, r, true);
-    }
-  }
-}
-
-function tileGet(tile, sel) {
-  var list = tile.querySelectorAll(sel);
-  return list.length ? list[0] : null;
-}
-
-function setVal(key, r, skipPush) {
-  var c = cells[key];
-  if (!c) return;
-  c.v.textContent = r.value === null || r.value === undefined ? '—' : r.value;
-  c.unit.textContent = (r.value !== null && r.value !== undefined && UNITS[r.type]) ? UNITS[r.type] : '';
-  if (isSpark(c.sensor) && typeof r.value === 'number' && !skipPush) {
-    var h = hist[key];
-    if (!h) h = hist[key] = [];
-    h.push(r.value);
-    if (h.length > HIST_LEN) h.shift();
-    if (c.line && h.length > 1) c.line.setAttribute('points', points(h));
-  }
-  if (skipPush && c.line && hist[key] && hist[key].length > 1)
-    c.line.setAttribute('points', points(hist[key]));
-}
-
-// 增量更新：只作用于 visible 中的键；本轮缺失的键（传感器消失）回退为 —
-function applyUpdate(rows) {
-  var seen = {}, i, r, key;
-  for (i = 0; i < rows.length; i++) {
-    r = rows[i];
-    key = keyOf(r);
-    seen[key] = true;
-    if (cells[key]) setVal(key, r);
-  }
-  for (key in cells)
-    if (cells.hasOwnProperty(key) && !seen[key]) {
-      cells[key].v.textContent = '—';
-      cells[key].unit.textContent = '';
-    }
-}
-
 function init() {
-  tilesEl = document.getElementById('tiles');
-  emptyEl = document.getElementById('empty');
+  panelsEl = document.getElementById('panels');
   getJson('/api/config', function (c) {
-    cfg = c || { visible: [] };
+    cfg = c || { visible: [], alarms: [] };
     if (!cfg.visible) cfg.visible = [];
+    if (!cfg.alarms) cfg.alarms = [];
     var es = new EventSource('/api/stream');
     es.onmessage = function (e) {
       var rows;
       try { rows = JSON.parse(e.data); } catch (err) { return; }
-      if (!booted) { fullRender(rows); booted = true; }
-      else applyUpdate(rows);
-      document.getElementById('t').textContent = new Date().toLocaleTimeString();
+      if (!rows) return;
+      try {
+        if (!booted) { fullRender(rows); booted = true; }
+        else applyUpdate(rows);
+      } catch (err2) { /* 渲染异常:下一帧重试 */ }
+      var now = new Date();
+      document.getElementById('clock').textContent =
+        p2(now.getHours()) + ':' + p2(now.getMinutes()) + ':' + p2(now.getSeconds());
+      document.getElementById('live').className = 'dot';
     };
-    es.onerror = function () { document.getElementById('t').textContent = '重连中…'; };
+    es.onerror = function () {
+      document.getElementById('clock').textContent = '重连中…';
+      document.getElementById('live').className = 'dot off';
+    };
     initNotifications(es);
   });
 }
@@ -188,17 +529,16 @@ init();
   if (!ok) document.documentElement.className += ' no-grid';
 })();
 
-// 常驻显示屏适配：点按全屏 + 屏幕唤醒锁（Fully Kiosk 自身也会做，双保险）
+// 常驻显示屏适配:点按全屏 + 屏幕唤醒锁(Fully Kiosk 双保险)
 document.addEventListener('click', function (e) {
   var t = e.target;
   while (t && t.id !== 'gear' && t !== document.body) t = t.parentNode;
-  if (t && t.id === 'gear') return; // 点齿轮去设置页，不触发全屏
+  if (t && t.id === 'gear') return; // 点齿轮去设置页,不触发全屏
   if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-    var p = document.documentElement.requestFullscreen(); // 旧 WebView 返回 undefined，无 .catch
+    var p = document.documentElement.requestFullscreen();
     if (p && p.catch) p.catch(function () {});
   }
 });
-var wakeLock = null;
 function keepAwake() {
   try {
     if (navigator.wakeLock && navigator.wakeLock.request)

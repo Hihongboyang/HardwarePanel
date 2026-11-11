@@ -5,67 +5,216 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>设置 · HardwarePanel</title>
 <style>
+  /* 全 ES5 兼容:无 CSS 变量/inset/flex-gap;grid 有 flex 回退 */
   :root { color-scheme: dark; }
-  body { margin: 0 auto; padding: 16px; max-width: 720px;
-         font: 14px/1.5 system-ui, sans-serif; background: #111; color: #ddd;
-         -webkit-tap-highlight-color: transparent; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  h1 a { float: right; color: #8ab4f8; text-decoration: none; font-size: 14px; }
-  h2 { font-size: 14px; color: #8ab4f8; margin: 22px 0 6px; }
-  p { margin: 6px 0; }
-  .group { color: #777; font-size: 12px; margin: 12px 0 2px; }
-  label.row { display: block; margin: 2px 0; }
-  .hint { color: #666; font-size: 12px; margin: 4px 0 0; }
-  input, select, button { background: #1c1c1c; color: #ddd; border: 1px solid #333;
-                          border-radius: 6px; padding: 6px 8px; font: inherit; }
-  input[type=text] { width: 100%; box-sizing: border-box; }
-  input[type=number] { width: 100px; }
-  button { cursor: pointer; }
-  #save { background: #8ab4f8; color: #111; border: none; font-weight: 600;
-          padding: 8px 20px; margin-top: 18px; }
-  #msg { margin-left: 10px; }
-  .alarm { display: flex; gap: 6px; margin: 4px 0; flex-wrap: wrap; align-items: center; }
-  .alarm input[type=text].m { flex: 1; min-width: 120px; width: auto; }
-  .del { color: #f88; background: none; border: 1px solid #444; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font: 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif;
+         background: #0e0f11; color: #e8eaed; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 48px; }
+  .head { position: sticky; top: 0; z-index: 5; display: flex; align-items: center;
+          height: 52px; margin: 0 -20px 8px; padding: 0 16px;
+          background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .head .icon-btn { display: flex; align-items: center; justify-content: center;
+          width: 32px; height: 32px; margin-right: 8px; color: #9aa0a6;
+          background: none; border: none; border-radius: 8px; cursor: pointer;
+          transition: color .15s, background-color .15s; }
+  .head .icon-btn:hover { color: #e8eaed; background: #1c1e22; }
+  .head .icon-btn svg { width: 16px; height: 16px; }
+  .head h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  .head .hint-top { margin-left: auto; font-size: 12px; color: #62666c; }
+
+  .sec-head { display: flex; align-items: center; margin: 28px 0 4px; }
+  .sec-head h2 { font-size: 13px; font-weight: 600; margin: 0; }
+  .sec-tools { margin-left: auto; }
+  .mini { height: 24px; padding: 0 10px; margin-left: 6px; font-size: 12px; color: #9aa0a6;
+          background: none; border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
+          cursor: pointer; transition: color .15s, border-color .15s; }
+  .mini:hover { color: #e8eaed; border-color: rgba(255,255,255,.28); }
+  .hint { font-size: 12px; line-height: 1.6; color: #62666c; margin: 0 0 8px; }
+
+  /* 传感器分组卡片 */
+  #sensors { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .gcard { background: #15171a; border: 1px solid rgba(255,255,255,.07); border-radius: 12px;
+           padding: 4px 14px 6px; min-width: 0; }
+  .group-h { display: flex; align-items: baseline; justify-content: space-between;
+             margin: 10px 0 2px; font-size: 12px; color: #9aa0a6; }
+  .group-h .gn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .count { font-size: 11px; color: #62666c; margin-left: 12px;
+           font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  .srow { display: flex; align-items: center; height: 34px; }
+  .srow + .srow { border-top: 1px solid rgba(255,255,255,.05); }
+  .srow .name { flex: 1; min-width: 0; font-size: 14px; color: #9aa0a6;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                transition: color .15s; cursor: pointer; }
+  .srow.checked .name { color: #e8eaed; }
+  .type-tag { flex: none; min-width: 52px; margin-left: 12px; font-size: 11px; color: #62666c;
+              text-align: right; font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  .cb { position: relative; flex: none; width: 18px; height: 18px; margin: 0 12px 0 0;
+        -webkit-appearance: none; appearance: none; background: #0e0f11;
+        border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer;
+        transition: background-color .15s, border-color .15s; }
+  .cb:checked { background: #e2a44a; border-color: #e2a44a; }
+  .cb:checked::after { content: ""; position: absolute; left: 5px; top: 2px; width: 5px; height: 9px;
+                       border: solid #1a1206; border-width: 0 2px 2px 0;
+                       -webkit-transform: rotate(45deg); transform: rotate(45deg); }
+
+  /* 底部两列:告警规则 + 通知/轮播 */
+  .two-col { display: grid; gap: 0 40px; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  @media (max-width: 760px) { .two-col { grid-template-columns: minmax(0, 1fr); } }
+
+  .alarm-cols, .arow { display: flex; align-items: center; }
+  .alarm-cols { margin-bottom: 4px; }
+  .alarm-cols span, .arow input, .arow select { margin-right: 8px; }
+  .alarm-cols span:last-child, .arow .del { margin-right: 0; }
+  .alarm-cols span { font-size: 12px; color: #62666c; }
+  .acol-m { flex: 1; min-width: 110px; }
+  .acol-t { width: 116px; }
+  .acol-v { width: 76px; }
+  .acol-c { width: 64px; }
+  .acol-x { flex: none; width: 32px; }
+  .arow { margin-bottom: 8px; }
+  .arow input, .arow select { height: 32px; padding: 0 10px; font-size: 13px; color: #e8eaed;
+           background: #15171a; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; }
+  .arow input.m { flex: 1; min-width: 110px; }
+  .arow select.t { width: 116px; }
+  .arow input.v { width: 76px; }
+  .arow input.c { width: 64px; }
+  .arow .del { flex: none; width: 32px; height: 32px; padding: 0; color: #62666c; background: none;
+               border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+               display: flex; align-items: center; justify-content: center;
+               transition: color .15s, background-color .15s; }
+  .arow .del:hover { color: #e5484d; background: rgba(229,72,77,.1); }
+  .arow .del svg { width: 14px; height: 14px; }
+  .add { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; margin-top: 4px;
+         font-size: 13px; color: #9aa0a6; background: none; border: 1px dashed rgba(255,255,255,.18);
+         border-radius: 8px; cursor: pointer; transition: color .15s, border-color .15s; }
+  .add:hover { color: #e8eaed; border-color: rgba(255,255,255,.32); }
+  .add svg { width: 14px; height: 14px; margin-right: 6px; }
+
+  .frow { display: flex; align-items: center; margin: 8px 0; }
+  .frow input[type=text], .frow input[type=number], .frow select { height: 36px; padding: 0 10px;
+         font-size: 13px; color: #e8eaed; background: #15171a;
+         border: 1px solid rgba(255,255,255,.1); border-radius: 8px; }
+  .frow input:focus, .arow input:focus, .arow select:focus, button:focus {
+         outline: none; border-color: #e2a44a; box-shadow: 0 0 0 1px rgba(226,164,74,.35); }
+  .frow .lbl { flex: none; width: 100px; font-size: 13px; color: #9aa0a6; }
+  .frow .fill { flex: 1; min-width: 0; }
+  .frow .w-narrow { width: 120px; }
+  .frow .inline-l { font-size: 13px; color: #9aa0a6; white-space: nowrap; }
+
+  .save { height: 40px; padding: 0 20px; margin-top: 24px; font-size: 14px; font-weight: 600;
+          color: #1a1206; background: #e2a44a; border: none; border-radius: 8px; cursor: pointer;
+          transition: background-color .15s; }
+  .save:hover { background: #ecb262; }
+  .save:active { background: #d59a40; }
+  .msg { margin-left: 12px; font-size: 13px; color: #e2a44a; }
 </style>
 </head>
 <body>
-<h1><a href="/">返回信息屏 →</a>设置</h1>
+<div class="wrap">
+  <div class="head">
+    <a class="icon-btn" href="/" title="返回信息屏">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+    </a>
+    <h1>设置</h1>
+    <span class="hint-top">保存后立即生效(信息屏刷新后套用)</span>
+  </div>
 
-<h2>显示的传感器（信息页磁贴）</h2>
-<div id="sensors">加载中…</div>
+  <div class="two-col">
+    <div>
+      <div class="sec-head"><h2>告警规则</h2></div>
+      <p class="hint">匹配 = 传感器名包含该文字(忽略大小写,填原始名如 CPU Package);超过阈值且过冷却时间则推送到屏幕和 webhook。数值进入阈值九成区间时,信息屏上先变琥珀色预警。</p>
+      <div class="alarm-cols">
+        <span class="acol-m">匹配</span><span class="acol-t">类型</span><span class="acol-v">超过</span><span class="acol-c">冷却(分)</span><span class="acol-x"></span>
+      </div>
+      <div id="alarms"></div>
+      <button class="add" id="addAlarm" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>添加告警
+      </button>
+    </div>
+    <div>
+      <div class="sec-head"><h2>通知</h2></div>
+      <div class="frow"><span class="lbl">Webhook</span>
+        <input class="fill" id="webhookUrl" type="text" placeholder="https://ntfy.sh/&lt;topic&gt;,留空不推送"></div>
+      <div class="frow"><span class="lbl">格式</span>
+        <select id="webhookFormat" class="w-narrow"><option value="ntfy">ntfy</option><option value="generic">generic</option></select></div>
+      <div class="frow"><span class="lbl">通知 token</span>
+        <input class="fill" id="token" type="text" placeholder="留空不校验"></div>
+      <p class="hint">ntfy:手机装 ntfy App 订阅同名 topic 即可收到推送;generic:POST {"title","body","source"}。</p>
 
-<h2>告警规则（仅支持“超过”比较）</h2>
-<div id="alarms"></div>
-<button id="addAlarm" type="button">＋ 添加告警</button>
-<p class="hint">匹配 = 传感器名包含该文字（忽略大小写）；类型留空 = 不限；超过阈值且过冷却时间则推送到屏幕/webhook。</p>
+      <div class="sec-head"><h2>轮播</h2></div>
+      <div class="frow"><span class="lbl">间隔(秒)</span>
+        <input class="w-narrow" id="interval" type="number" min="3" step="1" value="10">
+        <span class="inline-l" style="margin-left:12px;color:#62666c">最小 3 秒</span></div>
+    </div>
+  </div>
+  <button id="saveTop" class="save" type="button">保存</button><span class="msg" id="msgTop"></span>
 
-<h2>通知与轮播</h2>
-<p><label>Webhook URL（如 https://ntfy.sh/你的topic，留空=不推送）<br>
-  <input id="webhookUrl" type="text" placeholder="https://ntfy.sh/&lt;topic&gt;"></label></p>
-<p><label>格式 <select id="webhookFormat">
-  <option value="ntfy">ntfy</option>
-  <option value="generic">generic</option>
-</select></label>
-<label style="margin-left:16px">通知 token <input id="token" type="text" placeholder="留空=不校验"></label></p>
-<p class="hint">ntfy：手机装 ntfy App 订阅同名 topic 即可收到推送；generic：POST {"title","body","source"}。</p>
-<p><label>轮播间隔（秒，最小 3） <input id="interval" type="number" min="3" step="1"></label></p>
+  <div class="sec-head">
+    <h2>信息屏面板</h2>
+    <span class="sec-tools">
+      <button class="mini" id="selAll" type="button">全选</button>
+      <button class="mini" id="selNone" type="button">全不选</button>
+      <button class="mini" id="selKeep" type="button">还原</button>
+    </span>
+  </div>
+  <p class="hint">勾选要显示的传感器(按硬件分组)。信息屏固定 4 个面板:处理器 / 显卡 / 内存·主板 / 存储·系统;「CPU Core #N」自动汇成线程负载条;每个面板的第一个温度或负载类传感器作为大字指标并配 5 分钟曲线,其余以数字显示,条目多时自动变紧凑。</p>
+  <div id="sensors"><p class="hint">加载中…</p></div>
 
-<button id="save" type="button">保存</button><span id="msg"></span>
+  <button id="saveBottom" class="save" type="button">保存</button><span class="msg" id="msgBottom"></span>
 
 <script>
-// 全 ES5：兼容安卓 5 旧 WebView（XHR + function/var，无 fetch/箭头/模板串/??/?./includes）。
+// 全 ES5:兼容安卓 5 旧 WebView(XHR + function/var,无 fetch/箭头/模板串/??/?./includes)。
+function $(id) { return document.getElementById(id); }
 function esc(s) {
   return String(s).replace(/[&<>"']/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   });
 }
 function keyOf(r) { return r.hardware + '|' + r.sensor + '|' + r.type; }
-function $(id) { return document.getElementById(id); }
-function toList(nodes) { return Array.prototype.slice.call(nodes); }
 
-var TYPES = ['Temperature', 'Load', 'Power', 'Data', 'Fan', 'Clock', 'Voltage'];
-var cfg = null;
+var TYPE_CN = {
+  Temperature: '温度', Load: '负载', Power: '功耗', Data: '数据',
+  Fan: '风扇', Clock: '频率', Voltage: '电压', Throughput: '速度', Level: '寿命'
+};
+var TYPES = ['Temperature', 'Load', 'Power', 'Data', 'Fan', 'Clock', 'Voltage', 'Throughput', 'Level'];
+
+/* 中文名与信息屏共用同一张表 */
+var CN2 = {
+  'Core (Tctl/Tdie)|Temperature': '封装温度', 'CPU Package|Temperature': '封装温度',
+  'CCD1 (Tdie)|Temperature': 'CCD 温度', 'Core Average|Temperature': '平均核温',
+  'CPU Total|Load': '总负载', 'CPU Core Max|Load': '最大核负载',
+  'CPU Package|Power': '封装功耗', 'Package|Power': '封装功耗', 'Package Power|Power': '封装功耗',
+  'Cores (Average)|Clock': '平均频率', 'Bus Speed|Clock': '总线频率',
+  'Core (SVI2 TFN)|Voltage': '核心电压', 'SoC (SVI2 TFN)|Voltage': 'SoC 电压',
+  'CPU Fan|Fan': 'CPU 风扇', 'System Fan #1|Fan': '系统风扇 1', 'System Fan #2|Fan': '系统风扇 2',
+  'System Fan #3|Fan': '系统风扇 3', 'Pump Fan|Fan': '水泵风扇',
+  'CPU|Temperature': 'CPU 温度', 'System|Temperature': '系统温度', 'Motherboard|Temperature': '主板温度',
+  'VRM MOS|Temperature': '供电 VRM', 'MOS|Temperature': '供电 MOS', 'PCH|Temperature': '芯片组',
+  'Chipset|Temperature': '芯片组', 'CPU Socket|Temperature': 'CPU 插座', 'M2 #1|Temperature': 'M.2 插槽',
+  'Vcore|Voltage': 'Vcore', '+12V|Voltage': '+12V', '+5V|Voltage': '+5V', '+3.3V|Voltage': '+3.3V',
+  'DIMM|Voltage': '内存电压', 'CMOS Battery|Voltage': '主板电池', 'VBAT|Voltage': '主板电池',
+  'GPU Core|Temperature': '核心温度', 'GPU Hot Spot|Temperature': '热点',
+  'GPU Memory Junction|Temperature': '显存温度', 'GPU Memory|Temperature': '显存温度',
+  'GPU Core|Load': '使用率', 'GPU Memory|Load': '显存占用率',
+  'GPU Memory Controller|Load': '显存控制器', 'GPU Video Engine|Load': '视频引擎',
+  'D3D 3D|Load': '3D 引擎', 'GPU Core|Clock': '核心频率', 'GPU Memory|Clock': '显存频率',
+  'GPU Fan 1|Fan': '风扇', 'GPU Fan 2|Fan': '风扇 2',
+  'GPU Package|Power': '功耗', 'GPU Power|Power': '功耗', 'GPU Board Power|Power': '整板功耗',
+  'GPU Memory Used|Data': '显存占用', 'GPU Memory Free|Data': '显存空闲', 'GPU Memory Total|Data': '显存总量',
+  'Memory|Load': '内存使用率', 'Memory Used|Data': '已用内存', 'Memory Available|Data': '可用内存',
+  'Composite Temperature|Temperature': '温度', 'Temperature|Temperature': '温度',
+  'Temperature #1|Temperature': '温度 1', 'Temperature #2|Temperature': '温度 2',
+  'Read Rate|Throughput': '读取', 'Write Rate|Throughput': '写入',
+  'Used Space|Load': '已用空间', 'Free Space|Data': '剩余空间', 'Total Space|Data': '总空间',
+  'Life|Level': '寿命', 'Data Read|Data': '累计读取', 'Data Written|Data': '累计写入',
+  'Download Speed|Throughput': '下行', 'Upload Speed|Throughput': '上行',
+  'Network Utilization|Load': '网络使用率',
+  'Uptime|Data': '运行时间', 'Volume|Load': '主音量'
+};
+function cnOf(raw, type) { return CN2[raw + '|' + type] || raw; }
+
+var cfg = null, savedVisible = [];
 
 function getJson(url, cb) {
   var x = new XMLHttpRequest();
@@ -82,10 +231,13 @@ function getJson(url, cb) {
 
 function load() {
   getJson('/api/config', function (c) {
-    if (!c) { $('sensors').innerHTML = '<p class="hint">配置加载失败，请刷新重试</p>'; return; }
+    if (!c) { $('sensors').innerHTML = '<p class="hint">配置加载失败,请刷新重试</p>'; return; }
     cfg = c;
+    if (!cfg.visible) cfg.visible = [];
+    if (!cfg.alarms) cfg.alarms = [];
+    savedVisible = cfg.visible.slice(0);
     getJson('/api/sensors', function (sensors) {
-      if (!sensors) { $('sensors').innerHTML = '<p class="hint">传感器列表加载失败，请刷新重试</p>'; }
+      if (!sensors) { $('sensors').innerHTML = '<p class="hint">传感器列表加载失败,请刷新重试</p>'; }
       else renderSensors(sensors);
       renderAlarms();
       $('webhookUrl').value = (cfg.notify && cfg.notify.webhookUrl) || '';
@@ -97,6 +249,7 @@ function load() {
 }
 
 function renderSensors(sensors) {
+  // 按硬件分组(保持采集顺序);visible 中已消失的键追加到「已失效」卡,避免静默丢失
   var groups = {}, order = [], i, r, hw;
   for (i = 0; i < sensors.length; i++) {
     r = sensors[i];
@@ -104,64 +257,123 @@ function renderSensors(sensors) {
     if (!groups[hw]) { groups[hw] = []; order.push(hw); }
     groups[hw].push(r);
   }
-  var html = '';
+  var known = {}, html = '';
+  for (i = 0; i < sensors.length; i++) known[keyOf(sensors[i])] = 1;
+  var missing = [], m;
+  for (i = 0; i < cfg.visible.length; i++)
+    if (!known[cfg.visible[i]]) missing.push(cfg.visible[i]);
+
   for (i = 0; i < order.length; i++) {
     hw = order[i];
-    html += '<div class="group">' + esc(hw) + '</div>';
-    for (var j = 0; j < groups[hw].length; j++) {
+    var on = 0, j;
+    for (j = 0; j < groups[hw].length; j++) if (cfg.visible.indexOf(keyOf(groups[hw][j])) !== -1) on++;
+    html += '<div class="gcard"><div class="group-h"><span class="gn">' + esc(hw) + '</span>' +
+            '<span class="count">' + on + ' / ' + groups[hw].length + '</span></div>';
+    for (j = 0; j < groups[hw].length; j++) {
       r = groups[hw][j];
       var key = keyOf(r);
-      var checked = (cfg.visible && cfg.visible.indexOf(key) !== -1) ? 'checked' : '';
-      html += '<label class="row"><input type="checkbox" data-key="' + esc(key) + '" ' + checked + '> ' +
-        esc(r.sensor) + ' <span style="color:#666">(' + esc(r.type) + ')</span></label>';
+      var checked = cfg.visible.indexOf(key) !== -1 ? ' checked' : '';
+      html += '<label class="srow' + (checked ? ' checked' : '') + '"><input class="cb" type="checkbox" data-key="' +
+              esc(key) + '"' + checked + '><span class="name" title="' + esc(r.sensor) + '">' +
+              esc(cnOf(r.sensor, r.type)) + '</span><span class="type-tag">' +
+              esc(TYPE_CN[r.type] || r.type) + '</span></label>';
     }
+    html += '</div>';
+  }
+  if (missing.length) {
+    html += '<div class="gcard"><div class="group-h"><span class="gn">已失效的配置项(传感器已消失)</span>' +
+            '<span class="count">' + missing.length + '</span></div>';
+    for (m = 0; m < missing.length; m++)
+      html += '<label class="srow"><input class="cb" type="checkbox" data-key="' + esc(missing[m]) +
+              '" checked><span class="name" title="' + esc(missing[m]) + '">' + esc(missing[m]) +
+              '</span><span class="type-tag">—</span></label>';
+    html += '</div>';
   }
   $('sensors').innerHTML = html || '<p class="hint">未读到传感器</p>';
 }
 
-function collectAlarms() { // 编辑行的当前值（渲染/删除前先收集，避免丢输入）
-  return toList(document.querySelectorAll('#alarms .alarm')).map(function (d) {
+function toList(nodes) { return Array.prototype.slice.call(nodes); }
+
+function setChecks(fn) {
+  var cbs = toList($('sensors').getElementsByTagName('input')), i;
+  for (i = 0; i < cbs.length; i++) {
+    if (cbs[i].className !== 'cb') continue;
+    cbs[i].checked = fn(cbs[i].getAttribute('data-key'));
+    cbs[i].parentNode.className = 'srow' + (cbs[i].checked ? ' checked' : '');
+  }
+  syncCounts();
+}
+$('selAll').onclick = function () { setChecks(function () { return true; }); };
+$('selNone').onclick = function () { setChecks(function () { return false; }); };
+$('selKeep').onclick = function () {
+  setChecks(function (key) { return savedVisible.indexOf(key) !== -1; });
+};
+$('sensors').onchange = function (e) { // 原生 label 转发点击,change 后同步点亮态与计数
+  var cb = e.target;
+  if (cb.className === 'cb') cb.parentNode.className = 'srow' + (cb.checked ? ' checked' : '');
+  syncCounts();
+};
+function syncCounts() {
+  var cards = $('sensors').getElementsByTagName('div'), i, j;
+  for (i = 0; i < cards.length; i++) {
+    if (cards[i].className !== 'gcard') continue;
+    var cbs = cards[i].getElementsByTagName('input'), on = 0;
+    for (j = 0; j < cbs.length; j++) if (cbs[j].checked) on++;
+    var spans = cards[i].getElementsByTagName('span');
+    spans[spans.length - 1].textContent = on + ' / ' + cbs.length;
+  }
+}
+
+/* ---------- 告警行编辑器(collect/render 模式,编辑不丢输入) ---------- */
+function collectAlarms() {
+  return toList($('alarms').getElementsByTagName('div')).map(function (d) {
+    var q = function (cls) {
+      var els = d.getElementsByTagName('input'), k;
+      for (k = 0; k < els.length; k++) if (els[k].className === cls) return els[k];
+      return null;
+    };
     return {
-      match: d.querySelector('.m').value.trim(),
-      type: d.querySelector('.t').value,
+      match: q('m').value.trim(),
+      type: d.getElementsByTagName('select')[0].value,
       op: '>',
-      value: parseFloat(d.querySelector('.v').value) || 0,
-      cooldownMinutes: Math.max(0, parseInt(d.querySelector('.c').value, 10) || 0),
+      value: parseFloat(q('v').value) || 0,
+      cooldownMinutes: Math.max(0, parseInt(q('c').value, 10) || 0)
     };
   });
 }
-
+var ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>';
 function renderAlarms() {
   var html = '', i, j, a;
   for (i = 0; i < cfg.alarms.length; i++) {
     a = cfg.alarms[i];
-    html += '<div class="alarm">' +
+    html += '<div class="arow">' +
       '<input class="m" type="text" placeholder="传感器名包含" value="' + esc(a.match) + '">' +
       '<select class="t"><option value=""' + (a.type === '' ? ' selected' : '') + '>不限类型</option>';
     for (j = 0; j < TYPES.length; j++)
-      html += '<option' + (a.type === TYPES[j] ? ' selected' : '') + '>' + TYPES[j] + '</option>';
+      html += '<option value="' + TYPES[j] + '"' + (a.type === TYPES[j] ? ' selected' : '') + '>' +
+              (TYPE_CN[TYPES[j]] || TYPES[j]) + '</option>';
     html += '</select>' +
       '<input class="v" type="number" step="any" placeholder="阈值" value="' + a.value + '">' +
-      '<input class="c" type="number" min="0" step="1" title="冷却（分钟）" value="' + a.cooldownMinutes + '">' +
-      '<button class="del" type="button" data-i="' + i + '">删除</button></div>';
+      '<input class="c" type="number" min="0" step="1" title="冷却(分钟)" value="' + a.cooldownMinutes + '">' +
+      '<button class="del" type="button" data-i="' + i + '" title="删除">' + ICON_TRASH + '</button></div>';
   }
   $('alarms').innerHTML = html;
 }
-
 $('addAlarm').onclick = function () {
   cfg.alarms = collectAlarms();
   cfg.alarms.push({ match: '', type: '', op: '>', value: 90, cooldownMinutes: 10 });
   renderAlarms();
 };
-$('alarms').onclick = function (e) { // 事件委托（旧 WebView 无 closest）
+$('alarms').onclick = function (e) { // 事件委托(旧 WebView 无 closest)
   var t = e.target;
-  if (!t.getAttribute || t.getAttribute('class') !== 'del') return;
+  while (t && t !== this && t.className !== 'del') t = t.parentNode;
+  if (!t || t === this) return;
   cfg.alarms = collectAlarms();
   cfg.alarms.splice(parseInt(t.getAttribute('data-i'), 10), 1);
   renderAlarms();
 };
 
-$('save').onclick = function () {
+function doSave() {
   var checked = toList(document.querySelectorAll('#sensors input[type=checkbox]:checked'))
     .map(function (c) { return c.getAttribute('data-key'); });
   var out = {
@@ -170,23 +382,28 @@ $('save').onclick = function () {
     notify: {
       webhookUrl: $('webhookUrl').value.trim(),
       webhookFormat: $('webhookFormat').value,
-      token: $('token').value,
+      token: $('token').value
     },
-    photos: { intervalSeconds: Math.max(3, parseInt($('interval').value, 10) || 10) },
+    photos: { intervalSeconds: Math.max(3, parseInt($('interval').value, 10) || 10) }
   };
-  var msg = $('msg');
-  msg.style.color = '#999';
-  msg.textContent = '保存中…';
+  var msgs = [$('msgTop'), $('msgBottom')], i;
+  for (i = 0; i < msgs.length; i++) msgs[i].textContent = '保存中…';
   var x = new XMLHttpRequest();
   x.open('PUT', '/api/config', true);
   x.setRequestHeader('Content-Type', 'application/json');
   x.onreadystatechange = function () {
     if (x.readyState !== 4) return;
-    if (x.status === 200) { msg.style.color = '#8f8'; msg.textContent = '已保存'; }
-    else { msg.style.color = '#f77'; msg.textContent = '失败：HTTP ' + x.status; }
+    var text = x.status === 200 ? '已保存,返回信息屏刷新生效' : '失败:HTTP ' + x.status;
+    if (x.status === 200) savedVisible = checked.slice(0);
+    for (var j = 0; j < msgs.length; j++) msgs[j].textContent = text;
+    setTimeout(function () {
+      for (var k = 0; k < msgs.length; k++) msgs[k].textContent = '';
+    }, 3000);
   };
   x.send(JSON.stringify(out));
-};
+}
+$('saveTop').onclick = doSave;
+$('saveBottom').onclick = doSave;
 
 load();
 </script>
