@@ -10,11 +10,13 @@ internal sealed class MainForm : Form
     private readonly Computer _computer = new()
     {
         IsCpuEnabled = true,        // CPU 温度 / 封装功耗 / 负载
-        IsGpuEnabled = true,        // 独显才有意义；核显走性能计数器
+        IsGpuEnabled = true,        // 独显（核显另有性能计数器伪行）
         IsMemoryEnabled = true,     // 内存使用量
-        IsMotherboardEnabled = true // SuperIO：主板温度 / 风扇 / 电压
+        IsMotherboardEnabled = true,// SuperIO：主板温度 / 风扇 / 电压
+        IsStorageEnabled = true,    // 磁盘温度 / 读写速率 / 寿命
+        IsNetworkEnabled = true,    // 网卡上下行速率
     };
-
+    private readonly VolumeLevel _volume = new();
     private readonly GpuCounters _gpu = new();
     private readonly SensorHub _hub = new();
     private readonly ListView _view = new()
@@ -27,11 +29,13 @@ internal sealed class MainForm : Form
     private bool _exiting;
     private bool _seeded;   // 首帧采集后是否已尝试生成默认 visible
 
-    // 只要这些量：温度 / 负载 / 功耗 / 风扇 / 内存数据 / 频率 / 电压
+    // 只要这些量：温度 / 负载 / 功耗 / 风扇 / 数据 / 频率 / 电压 / 速率 / 寿命
+    // （SmallData 在 lib 0.9.7-pre782 中不存在；GPU 显存行在此版本为 Data，按 MB 显示）
     private static readonly HashSet<SensorType> Wanted =
     [
         SensorType.Temperature, SensorType.Load, SensorType.Power, SensorType.Fan,
         SensorType.Data, SensorType.Clock, SensorType.Voltage,
+        SensorType.Throughput, SensorType.Level,
     ];
 
     private static readonly Dictionary<SensorType, string> Units = new()
@@ -44,6 +48,8 @@ internal sealed class MainForm : Form
         [SensorType.Clock] = "MHz",
         [SensorType.Voltage] = "V",
         [SensorType.Current] = "A",
+        [SensorType.Level] = "%",        // SSD 寿命
+        [SensorType.Throughput] = "MB/s",// 会在 Collect 里换算
     };
 
     public MainForm(bool startHidden)
@@ -103,13 +109,23 @@ internal sealed class MainForm : Form
         {
             Collect(hw, rows);
             foreach (IHardware sub in hw.SubHardware) // 主板 SuperIO 在这里（风扇/电压）
-                Collect(sub, rows);
+                Collect(sub, rows, hw.Name);          // 行挂主板名，前端按主板分组
         }
 
-        var (util, dedicated, shared) = _gpu.Read();
-        rows.Add(new SensorRow("GPU 核显", "总使用率", "Load", Math.Round(util, 1), "%"));
-        rows.Add(new SensorRow("GPU 核显", "专用显存", "Data", Math.Round(dedicated / 1024 / 1024, 1), "MB"));
-        rows.Add(new SensorRow("GPU 核显", "共享内存", "Data", Math.Round(shared / 1024 / 1024, 1), "MB"));
+        // 以下每个来源独立容错：任何一个读不到都只是少一行，不中断采集
+        try
+        {
+            var (util, dedicated, shared) = _gpu.Read();
+            rows.Add(new SensorRow("GPU 核显", "总使用率", "Load", Math.Round(util, 1), "%"));
+            rows.Add(new SensorRow("GPU 核显", "专用显存", "Data", Math.Round(dedicated / 1024 / 1024, 1), "MB"));
+            rows.Add(new SensorRow("GPU 核显", "共享内存", "Data", Math.Round(shared / 1024 / 1024, 1), "MB"));
+        }
+        catch { /* 核显计数器不可用：跳过 */ }
+
+        rows.Add(new SensorRow("系统", "Uptime", "Data",
+            Math.Round(TimeSpan.FromMilliseconds(Environment.TickCount64).TotalSeconds, 0), "s"));
+        rows.Add(new SensorRow("系统", "Volume", "Load", _volume.Read(), "%"));
+
 
         Render(rows);
         _hub.Publish(rows);
@@ -123,19 +139,40 @@ internal sealed class MainForm : Form
         return rows.Count;
     }
 
-    private static void Collect(IHardware hw, List<SensorRow> rows)
+    /// <summary>单个硬件的采集独立容错：某个硬件/传感器读挂了只丢自己的行，不影响其它硬件。</summary>
+    private static void Collect(IHardware hw, List<SensorRow> rows, string? nameOverride = null)
     {
-        hw.Update();
+        string name = nameOverride ?? hw.Name;
+        try
+        {
+            hw.Update();
+        }
+        catch { return; /* 驱动/传感器异常：跳过整个硬件 */ }
         foreach (ISensor s in hw.Sensors)
         {
-            if (!Wanted.Contains(s.SensorType) || s.Value is null)
-                continue;
-            rows.Add(new SensorRow(
-                hw.Name, s.Name, s.SensorType.ToString(),
-                Math.Round(s.Value.Value, 1),
-                Units.GetValueOrDefault(s.SensorType, "")));
+            try
+            {
+                if (!Wanted.Contains(s.SensorType) || s.Value is null)
+                    continue;
+                double v = s.Value.Value;
+                string unit = Units.GetValueOrDefault(s.SensorType, "");
+                if (s.SensorType == SensorType.Throughput)
+                {
+                    v /= 1048576.0; // 字节/秒 → MB/s
+                    unit = "MB/s";
+                }
+                else if (s.SensorType == SensorType.Data && IsGpuHardware(hw))
+                {
+                    unit = "MB";   // 此版本 LHM 的 GPU 显存行为 Data（值即 MB）
+                }
+                rows.Add(new SensorRow(name, s.Name, s.SensorType.ToString(), Math.Round(v, 2), unit));
+            }
+            catch { /* 单个传感器异常：继续下一个 */ }
         }
     }
+
+    private static bool IsGpuHardware(IHardware hw) =>
+        hw.HardwareType is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel;
 
     private void Render(List<SensorRow> rows)
     {
