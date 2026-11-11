@@ -16,3 +16,6 @@ img/
 .vs/
 *.user
 .vtmp/
+
+# 设计原型与参考资料(仅本地,不随仓库分发)
+prototype/

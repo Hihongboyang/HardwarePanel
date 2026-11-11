@@ -15,7 +15,9 @@ C# 单进程：LibreHardwareMonitorLib 内嵌读传感器 + HTTP 服务（端口
 | 数据 | 来源 |
 |---|---|
 | CPU/主板温度、风扇、电压、CPU 封装功耗、内存 | LHM（MSR / SuperIO，需管理员） |
+| 独立显卡（NVIDIA/AMD 温度/负载/风扇/显存/功耗）、磁盘（温度/读写速率/寿命）、网卡（上下行） | LHM（需管理员） |
 | GPU 使用率 / 显存（Intel 核显） | Windows 性能计数器 GPU Engine / GPU Adapter Memory |
+| 运行时间、主音量 | 伪行（TickCount64 / CoreAudio），读取失败显示 `—` |
 
 ## 运行
 
@@ -46,8 +48,8 @@ dotnet run -c Release
 
 ## 页面 / 接口 / 配置
 
-- `/` 信息屏：按 `config.json` 的 `visible` 列表自适应铺满一屏（无滚动），右上角 ⚙ 进设置页；
-  `/photos.html` 图片轮播页（点击/滑动切图，间隔可配）；`/settings.html` 配置页（勾选磁贴、编辑告警规则、webhook、轮播间隔）。
+- `/` 信息屏：按 `config.json` 的 `visible` 列表生成**面板式仪表盘**——按硬件分组固定 4 面板（处理器/显卡/内存·主板/存储·系统），每面板 1 个大字指标+5 分钟曲线，其余数字行（条目多自动变紧凑），`CPU Core #N` 汇成线程负载条；接近告警阈值数值变琥珀、越线变红并弹告警卡；界面中文；右上 ⚙ 进设置页；
+  `/photos.html` 图片轮播页（点击/滑动切图，间隔可配）；`/settings.html` 配置页（宽版分组卡片勾选传感器、全选/全不选/还原、编辑告警规则、webhook、轮播间隔）。
 - `GET/PUT /api/config` 读写整份配置（PUT 成功返回 `{"ok":true}` 并重置告警冷却）；`POST /api/notify` 推送外部通知到屏幕（若配置了 token 则需 `?token=`），示例：
 
   ```

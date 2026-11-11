@@ -14,13 +14,14 @@
 | `Program.cs` | 入口、单实例互斥体 | `Global\HardwarePanel` Mutex；`--tray` 参数 |
 | `MainForm.cs` | WinForms 宿主、采集编排、托盘、卸载 | `RefreshAll()`（采集→Render→Publish→Seed→告警）；`BuildTrayMenu()`；`Uninstall()` |
 | `GpuCounters.cs` | Intel 核显性能计数器（使用率/专用/共享） | `Read()` → (util, dedicated, shared) |
-| `SensorHub.cs` | HTTP + SSE + 通知广播 + 静态文件/图片 | `Publish()`、`Handle()` 路由、`HandleStream()`、`Notify()` |
+| `VolumeLevel.cs` | 主音量读取（CoreAudio COM，失败返回 null） | `Read()` → 0–100 / null |
+| `SensorHub.cs` | HTTP + SSE + 通知广播 + 静态文件/图片 | `Publish()`、`Handle` 路由、`HandleStream()`、`Notify()` |
 | `ConfigStore.cs` | 配置模型与读写 | `Load/Save/Clamp/SeedDefaultVisible`、`Current`（volatile）、`Alarms` 单例 |
 | `AlarmEngine.cs` | 阈值告警 | `Evaluate(cfg, rows)`、`ResetCooldowns()` |
 | `AutoStartHelper.cs` | 开机自启计划任务 | `IsEnabled/Enable/Disable`（schtasks，任务名 `HardwarePanel`） |
-| `wwwroot/index.html` | 信息屏（磁贴） | ES5 |
+| `wwwroot/index.html` | 信息屏（面板式，4 面板分组） | ES5 |
 | `wwwroot/photos.html` | 图片轮播 | ES5 |
-| `wwwroot/settings.html` | 配置页 | ES5 |
+| `wwwroot/settings.html` | 配置页（宽版分组卡片） | ES5 |
 | `wwwroot/notify.js` | toast 覆盖层（三页共用） | `initNotifications(es)` |
 
 ## 3. 进程与线程模型
@@ -74,9 +75,17 @@ SensorRow(Hardware, Sensor, Type, Value: double?, Unit, History: double[]?)
 - `ntfy`：`{"title":…, "message":body, "tags":["warning"]}`
 - `generic`：`{"title":…, "body":…, "source":…}`
 
-### 前端内存模型（index.html）
+### 前端内存模型（index.html，面板式）
 
-`hist{key→number[](≤300)}`、`cells{key→{v,unit,line,sensor}}`；全量帧建磁贴并灌 history，增量帧只改 `cfg.visible` 内的键，本轮缺失的键回退 `—`。
+- `cells{key→{v,unit,block,panel,hero,line,fill,thrLine,thr,bar,raw,type}}`：visible 中每个传感器一个单元；hero 单元额外持有曲线引用。
+- `hist{key→number[](≤300)}`：仅 hero 曲线；全量帧灌 `r.history`，增量帧逐秒 push。
+- `coreRefs[]`：每面板线程条；增量帧把 `CPU Core #N` / `Core #N` 负载按序映射到微条。
+- 面板归属：硬件名正则（处理器→0，显卡→1，内存/主板→2，其余含未知硬件→3）；`Uptime` 钉在处理器面板。
+- hero 选取：优先「命中告警规则的项」（阈值热区可见），否则第一个温度，否则第一个负载。
+- 阈值热区：`thrOf()` 与 `AlarmEngine` 同语义（子串+类型），≥阈值×0.9 琥珀、≥阈值 红；hero 与数字行都生效。
+- 密度阶梯：行数 ≤6 统计块 / 7–12 紧凑单行 / >12 紧凑双列（CSS columns）。
+- 中文名：`CN2['原始名|类型']` 字典（index/settings 共用一份），查不到显示原始名。
+- 容错：渲染路径逐项 try/catch；键缺失显示 `—`；未知硬件并入末面板；SSE 断线显示「重连中…」。
 
 ## 5. 数据流向（时序细节）
 
@@ -162,6 +171,9 @@ classDiagram
 7. **HttpListener 绑 `http://+:8080` 需管理员**（http.sys 强通配符），与传感器提权需求一致，故 manifest `requireAdministrator`。
 8. **`Root()` 目录解析**：优先 `AppContext.BaseDirectory`，兼容 `dotnet run`（cwd=项目根）；运行中实例按请求即时读盘 `wwwroot`，页面类改动无需重启。
 9. **发布规程**：托盘实例锁 exe 时 `mv HardwarePanel.exe HardwarePanel.exe.old` 再 publish（重命名运行中的 exe 合法）；非管理员 shell 杀不掉提权进程，`.old` 留待重启后删或被卸载清理。
+10. **逐级容错（R13 硬要求）**：任何参数获取失败不得崩溃、不得中断其它硬件。后端 `Collect` 逐硬件/逐传感器 try/catch，音量/核显计数器失败静默；前端渲染逐项 try/catch，键缺失显示 `—`，未知硬件并入「存储·系统」面板兜底。
+11. **面板归属是启发式正则而非白名单**：换机器（不同主板/显卡/磁盘）无需改代码；认不出的硬件名全部落到末面板，宁可挤一点也不丢数据。SuperIO 行挂主板名（`Collect(sub, rows, hw.Name)`）保证风扇/电压跟主板分组。
+12. **GPU 显存单位依赖 LHM 版本**：0.9.7-pre782 无 `SensorType.SmallData`（0.9.6 GUI 报告里有 `/smalldata/`），该版本 GPU 显存行为 `Data`（值即 MB）——用 `IsGpuHardware()` 判定后单位给 MB；升级 LHM 时需回归此处。
 
 ## 7. 构建 / 发布 / 打包
 

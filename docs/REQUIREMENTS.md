@@ -22,6 +22,8 @@
 | R9 | 软件卸载功能（清理自启任务 + 可选删除全部文件） | ✅ 本次 |
 | R10 | 可分发安装包（框架依赖 / 自包含两种 zip） | ✅ 本次 |
 | R11 | 兼容旧安卓 WebView（安卓 5.0.2，前端纯 ES5） | ✅ 本次 |
+| R12 | 数据源扩展：LHM 显卡（NVIDIA/AMD）/存储/网卡 + 运行时间/主音量伪行，AIDA64 配置项全覆盖 | ✅ 本次 |
+| R13 | 信息屏面板化重设计：按硬件分组固定 4 面板、阈值热区（琥珀预警→红告警）、界面中文化、设置页宽版 | ✅ 本次 |
 
 ## 3. 已实现功能矩阵
 
@@ -31,7 +33,8 @@
 |---|---|---|
 | 单实例互斥 | `Program.cs` | `Global\HardwarePanel` 互斥体，重复启动弹提示 |
 | 托盘驻留 | `MainForm.cs` | 关窗进托盘继续采集；双击恢复；`--tray` 启动直接进托盘 |
-| 1Hz 采集 | `MainForm.cs RefreshAll()` | LHM（CPU/主板/内存）+ 性能计数器（Intel 核显伪行）→ `List<SensorRow>` |
+| 1Hz 采集 | `MainForm.cs RefreshAll()` | LHM（CPU/主板/内存/显卡/存储/网卡）+ 性能计数器（Intel 核显伪行）+ 运行时间/主音量伪行；**逐硬件/逐传感器独立容错**，读不到只丢自己那行 |
+| 主音量读取 | `VolumeLevel.cs` | CoreAudio `IAudioEndpointVolume` COM 互操作；任何失败静默返回 null（该行显示 `—`） |
 | 环形历史 | `SensorHub.cs Ring` | 每键 300 点（5 分钟），供 sparkline |
 | HTTP 服务 | `SensorHub.cs` | HttpListener `http://+:8080`，http.sys（PID 4）代听 |
 | SSE 推流 | `SensorHub.cs HandleStream` | 全量首帧（含 history）+ 每秒增量 + notify/alarm 事件帧 |
@@ -46,10 +49,10 @@
 
 | 页面 | 功能 |
 |---|---|
-| `/`（index.html） | 磁贴网格一屏无滚动（auto-fit grid，旧机 flex 回退）；sparkline；键缺失显示 `—`；空 visible 引导去设置；右上 ⚙ |
+| `/`（index.html） | 面板式信息屏：按硬件分组固定 4 面板（处理器/显卡/内存·主板/存储·系统，未知硬件并入末面板）；每面板 1 个大字指标+5 分钟曲线，其余数字行（≤6 统计块 / 7-12 紧凑单行 / >12 紧凑双列）；`CPU Core #N` 自动汇成线程条；阈值热区（≥阈值九成变琥珀、越线变红，阈值来自 cfg.alarms）；界面中文化；键缺失显示 `—`；空 visible 引导去设置；旧机 flex 回退 |
 | `/photos.html` | 全屏交叉淡入轮播（间隔可配 ≥3s，60s 重取列表，首张随机，点击/滑动切图）；同时接收通知 |
-| `/settings.html` | 传感器勾选（按硬件分组）+ 告警行编辑器 + webhook/token/轮播间隔；PUT 保存 |
-| `/notify.js` | 共享 toast 覆盖层：notify 8s 自消；alarm 红框闪烁 + WebAudio 蜂鸣 3 声 + 点击关闭 |
+| `/settings.html` | 宽版（1080）：传感器按硬件分组卡片（中文名+原始名悬停）、全选/全不选/还原、失效配置项单独成卡防静默丢失；告警行编辑器（类型中文标签）+ webhook/token/轮播间隔；PUT 保存 |
+| `/notify.js` | 共享 toast 覆盖层：notify 8s 自消（含 source 角标）；alarm 红左边线闪烁 + 蜂鸣 3 声 + 点击关闭；整体 try/catch 不影响页面 |
 
 ### HTTP API
 
