@@ -13,13 +13,13 @@
         object-fit: contain; background: #000; opacity: 0;
         -webkit-transition: opacity 1s; transition: opacity 1s; }
   img.show { opacity: 1; }
-  /* 返回首页:悬浮右上角,半透明底保证亮图上也可见 */
+  /* 返回首页:悬浮右上角,NERV 红描边角标(直角,与首页同语言) */
   #home { position: fixed; top: 12px; right: 12px; z-index: 10; display: flex;
           align-items: center; justify-content: center; width: 32px; height: 32px;
-          color: #9aa0a6; background: rgba(21,23,26,.85);
-          border: 1px solid rgba(255,255,255,.09); border-radius: 8px;
-          cursor: pointer; transition: color .15s, background-color .15s; }
-  #home:hover { color: #e8eaed; background: #1c1e22; }
+          color: #d8d8d0; background: rgba(5,5,5,.82);
+          border: 1px solid rgba(204,32,32,.6);
+          cursor: pointer; transition: color .15s, border-color .15s, background-color .15s; }
+  #home:hover { color: #ff5050; border-color: #ff3030; background: #0c0c0e; }
   #home svg { width: 16px; height: 16px; }
 </style>
 </head>

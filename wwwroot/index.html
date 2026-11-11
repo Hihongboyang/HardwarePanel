@@ -6,32 +6,52 @@
 <title>HardwarePanel</title>
 <style>
   /* 全 ES5 兼容:无 CSS 变量/inset/flex-gap;clamp() 前写像素回退;grid 有 flex 回退 */
+  /* EVA/NERV 皮肤:真黑底;荧光色各司其职——红 #ff3030/#cc2020(标识/警报)、绿 #50ff50(正常)、钢灰(辅助文字);全直角;CRT 扫描线 */
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; overflow: hidden; }
   body { margin: 0; display: flex; flex-direction: column;
          font: 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif;
-         background: #0e0f11; color: #e8eaed;
+         background: #000; color: #e8ece9;
          -webkit-user-select: none; user-select: none; }
-  .mono, .clock, .hv, .rv { font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
+  .mono, .clock, .hv, .rv, .ptag, .n-item, .en, .count { font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
 
-  header { flex: none; display: flex; align-items: center; height: 44px; padding: 0 16px;
-           border-bottom: 1px solid rgba(255,255,255,.07); }
-  .brand { font-size: 14px; font-weight: 600; white-space: nowrap; }
-  .clock { margin-left: auto; font-size: 13px; color: #9aa0a6;
+  /* CRT 氛围:细扫描线 + 暗角 + 一条慢速红色扫描带(唯一常驻循环动效) */
+  body::after { content: ""; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9998;
+                pointer-events: none;
+                background: repeating-linear-gradient(0deg, rgba(255,255,255,.015) 0, rgba(255,255,255,.015) 1px, transparent 1px, transparent 3px); }
+  body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9997;
+                 pointer-events: none;
+                 background: radial-gradient(ellipse 75% 75% at center, transparent 58%, rgba(0,0,0,.4) 100%); }
+  .scanband { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 9996; pointer-events: none;
+              background: linear-gradient(90deg, transparent 0%, rgba(255,48,48,.08) 25%, rgba(255,48,48,.2) 50%, rgba(255,48,48,.08) 75%, transparent 100%);
+              -webkit-animation: scan-sweep 9s linear infinite; animation: scan-sweep 9s linear infinite; }
+  @-webkit-keyframes scan-sweep { from { -webkit-transform: translateY(0); } to { -webkit-transform: translateY(100vh); } }
+  @keyframes scan-sweep { from { transform: translateY(0); } to { transform: translateY(100vh); } }
+
+  header { flex: none; display: flex; align-items: center; height: 46px; padding: 0 14px;
+           background: #050505; border-bottom: 1px solid #8c1616; }
+  .brand { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+  .brand .mark { flex: none; width: 18px; height: 20px; margin-right: 9px; color: #ff3030; }
+  .brand .bt { display: block; }
+  .brand .zh { display: block; font-size: 14px; font-weight: 600; color: #e8ece9; letter-spacing: .06em; }
+  .brand .en { display: block; margin-top: 1px; font-size: 8px; line-height: 1; color: #cc2020; letter-spacing: .3em; }
+  .clock { margin-left: auto; display: flex; align-items: center; padding: 3px 10px; font-size: 14px;
+           color: #ff5050; background: rgba(255,48,48,.05); border: 1px solid rgba(204,32,32,.5);
            font-variant-numeric: tabular-nums; white-space: nowrap; }
   .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-         background: #e2a44a; margin-right: 10px; vertical-align: 1px; }
-  .dot.off { background: #62666c; }
+         background: #50ff50; box-shadow: 0 0 5px rgba(80,255,80,.55);
+         margin-right: 9px; vertical-align: 1px; }
+  .dot.off { background: #555b55; box-shadow: none; }
   .icon-btn { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;
-              margin-left: 8px; color: #9aa0a6; background: none; border: none; border-radius: 8px;
-              cursor: pointer; transition: color .15s, background-color .15s; }
-  .icon-btn:hover { color: #e8eaed; background: #1c1e22; }
+              margin-left: 6px; color: #8a8e8a; background: none; border: 1px solid transparent;
+              cursor: pointer; transition: color .15s, background-color .15s, border-color .15s; }
+  .icon-btn:hover { color: #ff5050; background: #101013; border-color: rgba(204,32,32,.35); }
   .icon-btn svg { width: 16px; height: 16px; }
 
   /* 面板网格:固定 2×2(空面板自动隐藏),竖屏 1 列 */
   #panels { flex: 1; min-height: 0; width: 100%; max-width: 1280px; margin: 0 auto;
-            padding: 12px; display: grid; gap: 12px;
+            padding: 10px; display: grid; gap: 10px;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             grid-auto-rows: minmax(0, 1fr); }
   @media (max-width: 560px) {
@@ -39,34 +59,43 @@
     .panel { min-height: 132px; }
   }
   #panels .empty { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center;
-            justify-content: center; gap: 10px; color: #62666c; }
-  #panels .empty a { color: #e2a44a; }
+            justify-content: center; color: #6a6e6a; }
+  #panels .empty a { color: #ff5050; }
 
-  .panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
-           background: #15171a; border: 1px solid rgba(255,255,255,.07); border-radius: 14px;
-           padding: 12px 14px; }
-  .p-head { flex: none; display: flex; align-items: center; }
-  .p-head svg { flex: none; width: 16px; height: 16px; color: #62666c; margin-right: 8px; }
-  .p-head .nm { font-size: 13px; font-weight: 600; color: #9aa0a6;
+  .panel { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0;
+           overflow: hidden; background: #0c0c0e; border: 1px solid rgba(190,35,35,.38);
+           padding: 12px 14px; border-radius: 0; }
+  /* EVA 取景框角标 */
+  .panel .corner { position: absolute; width: 9px; height: 9px; pointer-events: none; color: #ff3030; }
+  .panel .corner.tl { top: -1px; left: -1px; border-top: 2px solid #ff3030; border-left: 2px solid #ff3030; }
+  .panel .corner.br { bottom: -1px; right: -1px; border-bottom: 2px solid #ff3030; border-right: 2px solid #ff3030; }
+
+  .p-head { flex: none; display: flex; align-items: center; padding-bottom: 7px;
+            border-bottom: 1px solid rgba(190,35,35,.3); }
+  .p-head .hexnode { flex: none; width: 13px; height: 15px; margin-right: 8px; color: #ff3030; }
+  .p-head .hexnode .hxf { fill: rgba(255,48,48,.14); stroke: none; }
+  .p-head .nm { font-size: 12px; font-weight: 600; color: #d8d8d0; letter-spacing: .05em;
                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .p-head .n-item { margin-left: auto; padding-left: 12px; font-size: 11px; color: #62666c;
+  .p-head .ptag { flex: none; margin-left: 8px; font-size: 8px; color: #cc2020; letter-spacing: .18em; }
+  .p-head .n-item { margin-left: auto; padding-left: 12px; font-size: 10px; color: #6a6e6a;
                     font-variant-numeric: tabular-nums; }
   .p-body { flex: 1; min-height: 0; display: flex; margin-top: 8px; }
 
   /* 左:该面板的关键指标(唯一的曲线) */
   .hero { display: flex; flex-direction: column; width: 42%; min-width: 0; }
-  .hero .hl { font-size: 11px; color: #62666c; white-space: nowrap;
+  .hero .hl { font-size: 11px; color: #8a8e8a; white-space: nowrap;
               overflow: hidden; text-overflow: ellipsis; }
   .hero .hv { margin-top: 2px; font-size: 22px; font-size: clamp(18px, 3.8vmin, 42px);
-              line-height: 1.05; color: #e8eaed; font-variant-numeric: tabular-nums;
-              white-space: nowrap; transition: color .3s; }
-  .hero .hu { font-size: 11px; font-size: clamp(10px, 1.3vmin, 13px); color: #62666c;
+              line-height: 1.05; color: #eef2ee; font-variant-numeric: tabular-nums;
+              text-shadow: 0 0 12px rgba(235,255,235,.13);
+              white-space: nowrap; transition: color .3s, text-shadow .3s; }
+  .hero .hu { font-size: 11px; font-size: clamp(10px, 1.3vmin, 13px); color: #6a6e6a;
               margin-left: 4px; font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
   .hero .chart { flex: 1; min-height: 0; width: 100%; margin-top: 6px; }
-  .hero .chart .line { fill: none; stroke: #e2a44a; stroke-width: 1.5;
+  .hero .chart .line { fill: none; stroke: #ff3030; stroke-width: 1.5;
                        vector-effect: non-scaling-stroke; opacity: .9; transition: stroke .3s; }
-  .hero .chart .fillp { fill: rgba(226,164,74,.12); stroke: none; }
-  .hero .chart .thr { stroke: rgba(229,72,77,.45); stroke-width: 1;
+  .hero .chart .fillp { fill: rgba(255,48,48,.13); stroke: none; transition: fill .3s; }
+  .hero .chart .thr { stroke: rgba(255,80,80,.55); stroke-width: 1;
                       stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
 
   /* 右:其余指标,统一单行(标签左/数值右);% 行下挂细条;>12 条目时双列 */
@@ -76,16 +105,16 @@
   .srow2 { flex: 1; min-height: 0; display: flex; flex-wrap: wrap;
            align-items: baseline; padding: 2px 0; }
   .srow2 + .srow2 { border-top: 1px solid rgba(255,255,255,.05); }
-  .srow2 .rl { flex: 1; min-width: 40%; margin: 0 8px 0 0; font-size: 12px; color: #9aa0a6;
+  .srow2 .rl { flex: 1; min-width: 40%; margin: 0 8px 0 0; font-size: 12px; color: #8a8e8a;
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .srow2 .rvwrap { flex: none; white-space: nowrap; }
-  .srow2 .rv { font-size: 14px; font-size: clamp(13px, 2vmin, 20px); color: #e8eaed;
+  .srow2 .rv { font-size: 14px; font-size: clamp(13px, 2vmin, 20px); color: #e8ece9;
                font-variant-numeric: tabular-nums; transition: color .3s; }
-  .srow2 .ru { font-size: 10px; color: #62666c; margin-left: 4px; }
-  .srow2 .bar { flex-basis: 100%; height: 2px; margin-top: 3px; background: rgba(255,255,255,.08);
-                border-radius: 2px; position: relative; overflow: hidden; }
+  .srow2 .ru { font-size: 10px; color: #6a6e6a; margin-left: 4px; }
+  .srow2 .bar { flex-basis: 100%; height: 2px; margin-top: 3px; background: rgba(255,255,255,.07);
+                position: relative; overflow: hidden; }
   .srow2 .bar b { display: block; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-                  background: #e2a44a; border-radius: 2px;
+                  background: #c22222;
                   -webkit-transform-origin: 0 50%; transform-origin: 0 50%;
                   -webkit-transform: scaleX(.5); transform: scaleX(.5);
                   -webkit-transition: -webkit-transform .3s; transition: transform .3s; }
@@ -95,36 +124,52 @@
   .rows.multi .srow2 { -webkit-column-break-inside: avoid; break-inside: avoid; }
 
   /* 线程负载微条(transform 缩放,不动画布局属性) */
-  .cores-cap { flex: none; font-size: 11px; color: #62666c; margin-bottom: 4px; }
+  .cores-cap { flex: none; font-size: 11px; color: #6a6e6a; margin-bottom: 4px; }
   .cores { flex: none; display: flex; height: 22px; margin-bottom: 8px; }
   .cores i { display: block; position: relative; flex: 1; min-width: 0; height: 100%;
-             margin-right: 3px; background: rgba(255,255,255,.07); border-radius: 2px; }
+             margin-right: 3px; background: rgba(255,255,255,.06); }
   .cores i:last-child { margin-right: 0; }
   .cores i b { display: block; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-               background: #e2a44a; border-radius: 2px;
+               background: #c22222;
                -webkit-transform-origin: 50% 100%; transform-origin: 50% 100%;
                -webkit-transform: scaleY(.4); transform: scaleY(.4);
                -webkit-transition: -webkit-transform .3s; transition: transform .3s; }
 
-  /* 阈值热区:进入阈值九成区间琥珀,越线红(数值与曲线同步) */
-  .hero.warm .hv { color: #e2a44a; }
-  .hero.hot .hv { color: #e5484d; }
-  .hero.warm .chart .line { stroke: #e2a44a; }
-  .hero.warm .chart .fillp { fill: rgba(226,164,74,.14); }
-  .hero.hot .chart .line { stroke: #e5484d; opacity: 1; }
-  .hero.hot .chart .fillp { fill: rgba(229,72,77,.16); }
-  .srow2.warm .rv { color: #e2a44a; }
-  .srow2.hot .rv { color: #e5484d; }
-  .panel.hot { border-color: rgba(229,72,77,.4); }
+  /* 阈值热区:进入阈值九成区间琥珀预警,越线红 + EMERGENCY(数值与曲线同步) */
+  .hero.warm .hv { color: #ffb020; }
+  .hero.hot .hv { color: #ff5050; }
+  .hero.warm .chart .line { stroke: #ffb020; }
+  .hero.warm .chart .fillp { fill: rgba(255,176,32,.14); }
+  .hero.hot .chart .line { stroke: #ff3030; opacity: 1; }
+  .hero.hot .chart .fillp { fill: rgba(255,48,48,.18); }
+  .srow2.warm .rv { color: #ffb020; }
+  .srow2.warm .bar b { background: #b37614; }
+  .srow2.hot .rv { color: #ff5050; }
+  .srow2.hot .bar b { background: #ff3030; }
+  .panel.hot { border-color: #ff3030;
+               -webkit-animation: panel-alert 1s steps(2, end) infinite; animation: panel-alert 1s steps(2, end) infinite; }
+  .panel.hot .hexnode .hxf { fill: rgba(255,48,48,.6); }
+  .panel.hot .p-head .n-item::after { content: "EMERGENCY"; margin-left: 10px; color: #ff3030;
+               font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+               font-size: 9px; letter-spacing: .14em;
+               -webkit-animation: emergency-blink .8s steps(2, end) infinite; animation: emergency-blink .8s steps(2, end) infinite; }
+  @-webkit-keyframes emergency-blink { 50% { opacity: .15; } }
+  @keyframes emergency-blink { 50% { opacity: .15; } }
+  @-webkit-keyframes panel-alert { 50% { border-color: #5a0f0f; } }
+  @keyframes panel-alert { 50% { border-color: #5a0f0f; } }
 
   /* 旧 WebView 无 CSS Grid 时 flex 回退:面板照常铺排,允许滚动 */
   .no-grid #panels { display: flex; flex-wrap: wrap; align-content: flex-start; overflow-y: auto; }
-  .no-grid .panel { flex: 1 1 320px; min-height: 140px; margin: 0 12px 12px 0; }
+  .no-grid .panel { flex: 1 1 320px; min-height: 140px; margin: 0 10px 10px 0; }
 </style>
 </head>
 <body>
+<div class="scanband"></div>
 <header>
-  <span class="brand">硬件监控</span>
+  <span class="brand">
+    <svg class="mark" viewBox="0 0 20 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 1 19 6.5v9L10 21 1 15.5v-9z"/><path d="M10 5 15.8 8.35v6.3L10 18 4.2 14.65v-6.3z" fill="rgba(255,48,48,.4)" stroke="none"/></svg>
+    <span class="bt"><span class="zh">硬件监控</span><span class="en">HARDWARE PANEL</span></span>
+  </span>
   <span class="clock"><span class="dot" id="live"></span><span id="clock">--:--:--</span></span>
   <a class="icon-btn" id="photos" href="/photos.html" title="图片轮播">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
@@ -150,11 +195,14 @@ var coreRefs = [];     // 每面板线程条引用
 
 /* ---------- 中文名 / 面板归属:共享 lang.js;面板优先用后端目录 /api/hwinfo ---------- */
 var hwinfo = null;      // {panels:[...], keys:{key:{device,hwType,panel}}}
+/* 面板头:统一六边形状态蜂巢(签名元素,常态红描边,越限时内芯填充)
+   + 中文名 + 英文 mono 小标;旧硬件图标由双语标签取代 */
+var HEXNODE = '<svg class="hexnode" viewBox="0 0 20 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 1 19 6.5v9L10 21 1 15.5v-9z"/><path class="hxf" d="M10 5 15.8 8.35v6.3L10 18 4.2 14.65v-6.3z"/></svg>';
 var PANEL_DEFS = [
-  { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>', name: '处理器' },
-  { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>', name: '显卡' },
-  { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 19v-3"/><path d="M10 19v-3"/><path d="M14 19v-3"/><path d="M18 19v-3"/><path d="M8 11V9"/><path d="M16 11V9"/><path d="M12 11V9"/><path d="M2 15h20"/><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></svg>', name: '内存 · 主板' },
-  { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/></svg>', name: '存储 · 系统' }
+  { name: '处理器', tag: 'CPU' },
+  { name: '显卡', tag: 'GPU' },
+  { name: '内存 · 主板', tag: 'MEM / MB' },
+  { name: '存储 · 系统', tag: 'STO / SYS' }
 ];
 
 /* 面板归属:后端目录(HardwareType 权威判定)优先;旧 exe 无目录时回退名字正则 */
@@ -275,8 +323,10 @@ function fullRender(rows) {
 
     var el = document.createElement('div');
     el.className = 'panel';
-    var html = '<div class="p-head">' + PANEL_DEFS[i].icon + '<span class="nm">' + esc(PANEL_DEFS[i].name) +
-      '</span><span class="n-item">' + (rowItems.length + coreCount) + ' 项</span></div>' +
+    var html = '<div class="corner tl"></div><div class="corner br"></div>' +
+      '<div class="p-head">' + HEXNODE + '<span class="nm">' + esc(PANEL_DEFS[i].name) +
+      '</span><span class="ptag">' + PANEL_DEFS[i].tag + '</span><span class="n-item">' +
+      (rowItems.length + coreCount) + ' 项</span></div>' +
       '<div class="p-body"><div class="hero">' +
       '<div class="hl">' + esc(cnOf(hero.raw, hero.type)) + '</div>' +
       '<div class="hvwrap"><span class="hv">—</span><span class="hu">' + esc(hero.raw === 'Uptime' ? '' : hero.unit) + '</span></div>' +
@@ -292,8 +342,8 @@ function fullRender(rows) {
     for (var q = 0; q < rowItems.length; q++) {
       var rw = rowItems[q];
       html += '<div class="srow2">' +
-        '<div class="rvwrap"><span class="rv">—</span><span class="ru">' + esc(rw.raw === 'Uptime' ? '' : rw.unit) + '</span></div>' +
         '<div class="rl">' + esc(cnOf(rw.raw, rw.type)) + '</div>' +
+        '<div class="rvwrap"><span class="rv">—</span><span class="ru">' + esc(rw.raw === 'Uptime' ? '' : rw.unit) + '</span></div>' +
         (rw.type === 'Load' ? '<div class="bar"><b></b></div>' : '') + '</div>';
     }
     html += '</div></div>';
@@ -301,7 +351,7 @@ function fullRender(rows) {
     panelsEl.appendChild(el);
 
     // hero 引用(先取 .hero 容器,再在其内部查询,避免面板头角标占位)
-    var heroEl = el.getElementsByTagName('div')[2];
+    var heroEl = el.getElementsByTagName('div')[4]; // [0/1]=取景框角标 [2]=p-head [3]=p-body [4]=hero
     cells[hero.key] = {
       hero: true, panel: el, block: heroEl,
       v: heroEl.getElementsByTagName('span')[0], unit: hero.unit,

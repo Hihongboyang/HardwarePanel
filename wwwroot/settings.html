@@ -6,56 +6,61 @@
 <title>设置 · HardwarePanel</title>
 <style>
   /* 全 ES5 兼容:无 CSS 变量/inset/flex-gap;grid 有 flex 回退 */
+  /* EVA/NERV 皮肤:与 index.html 同一语言——真黑底、NERV 红、直角、mono 辅助字 */
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; font: 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif;
-         background: #0e0f11; color: #e8eaed; }
+         background: #000; color: #e8ece9; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 48px; }
   .head { position: sticky; top: 0; z-index: 5; display: flex; align-items: center;
           height: 52px; margin: 0 -20px 8px; padding: 0 16px;
-          background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
+          background: #050505; border-bottom: 1px solid #8c1616; }
   .head .icon-btn { display: flex; align-items: center; justify-content: center;
-          width: 32px; height: 32px; margin-right: 8px; color: #9aa0a6;
-          background: none; border: none; border-radius: 8px; cursor: pointer;
-          transition: color .15s, background-color .15s; }
-  .head .icon-btn:hover { color: #e8eaed; background: #1c1e22; }
+          width: 32px; height: 32px; margin-right: 8px; color: #8a8e8a;
+          background: none; border: 1px solid transparent; cursor: pointer;
+          transition: color .15s, background-color .15s, border-color .15s; }
+  .head .icon-btn:hover { color: #ff5050; background: #101013; border-color: rgba(204,32,32,.35); }
   .head .icon-btn svg { width: 16px; height: 16px; }
-  .head h1 { font-size: 16px; font-weight: 600; margin: 0; }
-  .head .hint-top { margin-left: auto; font-size: 12px; color: #62666c; }
+  .head h1 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: .06em; }
+  .head .hint-top { margin-left: auto; font-size: 12px; color: #6a6e6a; }
 
-  .sec-head { display: flex; align-items: center; margin: 28px 0 4px; }
-  .sec-head h2 { font-size: 13px; font-weight: 600; margin: 0; }
+  .sec-head { display: flex; align-items: center; margin: 28px 0 4px;
+              border-left: 3px solid #ff3030; padding-left: 10px; }
+  .sec-head h2 { font-size: 12px; font-weight: 600; margin: 0; color: #d8d8d0; letter-spacing: .05em; }
+  .sec-head .stag { margin-left: 8px; font-size: 8px; color: #cc2020; letter-spacing: .18em;
+                    font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
   .sec-tools { margin-left: auto; }
-  .mini { height: 24px; padding: 0 10px; margin-left: 6px; font-size: 12px; color: #9aa0a6;
-          background: none; border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
-          cursor: pointer; transition: color .15s, border-color .15s; }
-  .mini:hover { color: #e8eaed; border-color: rgba(255,255,255,.28); }
-  .hint { font-size: 12px; line-height: 1.6; color: #62666c; margin: 0 0 8px; }
+  .mini { height: 24px; padding: 0 10px; margin-left: 6px; font-size: 12px; color: #8a8e8a;
+          background: none; border: 1px solid rgba(255,255,255,.14); cursor: pointer;
+          transition: color .15s, border-color .15s; }
+  .mini:hover { color: #ff5050; border-color: rgba(204,32,32,.55); }
+  .hint { font-size: 12px; line-height: 1.6; color: #6a6e6a; margin: 0 0 8px; }
 
   /* 传感器分组卡片 */
   #sensors { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
-  .gcard { background: #15171a; border: 1px solid rgba(255,255,255,.07); border-radius: 12px;
+  .gcard { background: #0c0c0e; border: 1px solid rgba(190,35,35,.28);
            padding: 4px 14px 6px; min-width: 0; }
   .group-h { display: flex; align-items: baseline; justify-content: space-between;
-             margin: 10px 0 2px; font-size: 12px; color: #9aa0a6; }
+             margin: 10px 0 2px; font-size: 12px; color: #8a8e8a; }
   .group-h .gn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .count { font-size: 11px; color: #62666c; margin-left: 12px;
-           font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  .count { font-size: 11px; color: #6a6e6a; margin-left: 12px;
+           font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
   .srow { display: flex; align-items: center; height: 34px; }
   .srow + .srow { border-top: 1px solid rgba(255,255,255,.05); }
-  .srow .name { flex: 1; min-width: 0; font-size: 14px; color: #9aa0a6;
+  .srow .name { flex: 1; min-width: 0; font-size: 14px; color: #8a8e8a;
                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 transition: color .15s; cursor: pointer; }
-  .srow.checked .name { color: #e8eaed; }
-  .type-tag { flex: none; min-width: 52px; margin-left: 12px; font-size: 11px; color: #62666c;
-              text-align: right; font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  .srow.checked .name { color: #e8ece9; }
+  .srow.checked { box-shadow: inset 2px 0 0 #cc2020; }
+  .type-tag { flex: none; min-width: 52px; margin-left: 12px; font-size: 11px; color: #5c605c;
+              text-align: right; font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
   .cb { position: relative; flex: none; width: 18px; height: 18px; margin: 0 12px 0 0;
-        -webkit-appearance: none; appearance: none; background: #0e0f11;
-        border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer;
+        -webkit-appearance: none; appearance: none; background: #050505;
+        border: 1px solid rgba(255,255,255,.2); cursor: pointer;
         transition: background-color .15s, border-color .15s; }
-  .cb:checked { background: #e2a44a; border-color: #e2a44a; }
-  .cb:checked::after { content: ""; position: absolute; left: 5px; top: 2px; width: 5px; height: 9px;
-                       border: solid #1a1206; border-width: 0 2px 2px 0;
+  .cb:checked { background: #cc2020; border-color: #cc2020; }
+  .cb:checked::after { content: ""; position: absolute; left: 6px; top: 2px; width: 4px; height: 9px;
+                       border: solid #fff; border-width: 0 2px 2px 0;
                        -webkit-transform: rotate(45deg); transform: rotate(45deg); }
 
   /* 底部两列:告警规则 + 通知/轮播 */
@@ -66,48 +71,48 @@
   .alarm-cols { margin-bottom: 4px; }
   .alarm-cols span, .arow input, .arow select { margin-right: 8px; }
   .alarm-cols span:last-child, .arow .del { margin-right: 0; }
-  .alarm-cols span { font-size: 12px; color: #62666c; }
+  .alarm-cols span { font-size: 12px; color: #6a6e6a; }
   .acol-m { flex: 1; min-width: 110px; }
   .acol-t { width: 116px; }
   .acol-v { width: 76px; }
   .acol-c { width: 64px; }
   .acol-x { flex: none; width: 32px; }
   .arow { margin-bottom: 8px; }
-  .arow input, .arow select { height: 32px; padding: 0 10px; font-size: 13px; color: #e8eaed;
-           background: #15171a; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; }
+  .arow input, .arow select { height: 32px; padding: 0 10px; font-size: 13px; color: #e8ece9;
+           background: #0c0c0e; border: 1px solid rgba(255,255,255,.12); }
   .arow input.m { flex: 1; min-width: 110px; }
   .arow select.t { width: 116px; }
   .arow input.v { width: 76px; }
   .arow input.c { width: 64px; }
-  .arow .del { flex: none; width: 32px; height: 32px; padding: 0; color: #62666c; background: none;
-               border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+  .arow .del { flex: none; width: 32px; height: 32px; padding: 0; color: #6a6e6a; background: none;
+               border: 1px solid transparent; cursor: pointer;
                display: flex; align-items: center; justify-content: center;
                transition: color .15s, background-color .15s; }
-  .arow .del:hover { color: #e5484d; background: rgba(229,72,77,.1); }
+  .arow .del:hover { color: #ff3030; background: rgba(255,48,48,.08); }
   .arow .del svg { width: 14px; height: 14px; }
   .add { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; margin-top: 4px;
-         font-size: 13px; color: #9aa0a6; background: none; border: 1px dashed rgba(255,255,255,.18);
-         border-radius: 8px; cursor: pointer; transition: color .15s, border-color .15s; }
-  .add:hover { color: #e8eaed; border-color: rgba(255,255,255,.32); }
+         font-size: 13px; color: #8a8e8a; background: none; border: 1px dashed rgba(255,80,80,.28);
+         cursor: pointer; transition: color .15s, border-color .15s; }
+  .add:hover { color: #ff5050; border-color: rgba(255,80,80,.55); }
   .add svg { width: 14px; height: 14px; margin-right: 6px; }
 
   .frow { display: flex; align-items: center; margin: 8px 0; }
   .frow input[type=text], .frow input[type=number], .frow select { height: 36px; padding: 0 10px;
-         font-size: 13px; color: #e8eaed; background: #15171a;
-         border: 1px solid rgba(255,255,255,.1); border-radius: 8px; }
+         font-size: 13px; color: #e8ece9; background: #0c0c0e;
+         border: 1px solid rgba(255,255,255,.12); }
   .frow input:focus, .arow input:focus, .arow select:focus, button:focus {
-         outline: none; border-color: #e2a44a; box-shadow: 0 0 0 1px rgba(226,164,74,.35); }
-  .frow .lbl { flex: none; width: 100px; font-size: 13px; color: #9aa0a6; }
+         outline: none; border-color: #ff3030; box-shadow: 0 0 0 1px rgba(255,48,48,.35); }
+  .frow .lbl { flex: none; width: 100px; font-size: 13px; color: #8a8e8a; }
   .frow .fill { flex: 1; min-width: 0; }
   .frow .w-narrow { width: 120px; }
-  .frow .inline-l { font-size: 13px; color: #9aa0a6; white-space: nowrap; }
+  .frow .inline-l { font-size: 13px; color: #8a8e8a; white-space: nowrap; }
 
   .save { height: 40px; padding: 0 20px; margin-top: 24px; font-size: 14px; font-weight: 600;
-          color: #1a1206; background: #e2a44a; border: none; border-radius: 8px; cursor: pointer;
+          color: #fff; background: #cc2020; border: none; cursor: pointer;
           transition: background-color .15s; }
-  .save:hover { background: #ecb262; }
-  .save:active { background: #d59a40; }
-  .msg { margin-left: 12px; font-size: 13px; color: #e2a44a; }
+  .save:hover { background: #e02828; }
+  .save:active { background: #a81a1a; }
+  .msg { margin-left: 12px; font-size: 13px; color: #ff5050; }
 </style>
 </head>
 <body>
@@ -122,7 +127,7 @@
 
   <div class="two-col">
     <div>
-      <div class="sec-head"><h2>告警规则</h2></div>
+      <div class="sec-head"><h2>告警规则</h2><span class="stag">ALARM RULES</span></div>
       <p class="hint">匹配 = 传感器名包含该文字(忽略大小写,填原始名如 CPU Package);超过阈值且过冷却时间则推送到屏幕和 webhook。数值进入阈值九成区间时,信息屏上先变琥珀色预警。</p>
       <div class="alarm-cols">
         <span class="acol-m">匹配</span><span class="acol-t">类型</span><span class="acol-v">超过</span><span class="acol-c">冷却(分)</span><span class="acol-x"></span>
@@ -133,7 +138,7 @@
       </button>
     </div>
     <div>
-      <div class="sec-head"><h2>通知</h2></div>
+      <div class="sec-head"><h2>通知</h2><span class="stag">NOTIFY</span></div>
       <div class="frow"><span class="lbl">Webhook</span>
         <input class="fill" id="webhookUrl" type="text" placeholder="https://ntfy.sh/&lt;topic&gt;,留空不推送"></div>
       <div class="frow"><span class="lbl">格式</span>
@@ -142,16 +147,16 @@
         <input class="fill" id="token" type="text" placeholder="留空不校验"></div>
       <p class="hint">ntfy:手机装 ntfy App 订阅同名 topic 即可收到推送;generic:POST {"title","body","source"}。</p>
 
-      <div class="sec-head"><h2>轮播</h2></div>
+      <div class="sec-head"><h2>轮播</h2><span class="stag">PHOTOS</span></div>
       <div class="frow"><span class="lbl">间隔(秒)</span>
         <input class="w-narrow" id="interval" type="number" min="3" step="1" value="10">
-        <span class="inline-l" style="margin-left:12px;color:#62666c">最小 3 秒</span></div>
+        <span class="inline-l" style="margin-left:12px;color:#6a6e6a">最小 3 秒</span></div>
     </div>
   </div>
   <button id="saveTop" class="save" type="button">保存</button><span class="msg" id="msgTop"></span>
 
   <div class="sec-head">
-    <h2>信息屏面板</h2>
+    <h2>信息屏面板</h2><span class="stag">PANELS</span>
     <span class="sec-tools">
       <button class="mini" id="selAll" type="button">全选</button>
       <button class="mini" id="selNone" type="button">全不选</button>
