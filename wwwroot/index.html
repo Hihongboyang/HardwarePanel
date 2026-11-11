@@ -236,7 +236,13 @@ function fmt(v, unit, raw) {
 function points(h, thr) {
   var min = Infinity, max = -Infinity, i;
   for (i = 0; i < h.length; i++) { if (h[i] < min) min = h[i]; if (h[i] > max) max = h[i]; }
-  if (thr) { if (thr > max) max = thr; if (thr < min - 2) min = thr - 2; }
+  if (thr) {
+    // 有阈值:0 起标,曲线高度 = 占阈值比例,虚线位置即阈值 —— 一眼读出余量
+    max = Math.max(max, thr);
+    min = 0;
+  } else if (min === max) {
+    min = max - 1; // 无阈值且为平线:避免 0 跨度
+  }
   var span = (max - min) || 1, out = [], thrY = null;
   for (i = 0; i < h.length; i++)
     out.push((i / (h.length - 1) * 100).toFixed(1) + ',' + (15 - (h[i] - min) / span * 13).toFixed(1));
