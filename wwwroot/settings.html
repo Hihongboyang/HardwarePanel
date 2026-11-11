@@ -163,6 +163,7 @@
 
   <button id="saveBottom" class="save" type="button">保存</button><span class="msg" id="msgBottom"></span>
 
+<script src="/lang.js"></script>
 <script>
 // 全 ES5:兼容安卓 5 旧 WebView(XHR + function/var,无 fetch/箭头/模板串/??/?./includes)。
 function $(id) { return document.getElementById(id); }
@@ -173,47 +174,9 @@ function esc(s) {
 }
 function keyOf(r) { return r.hardware + '|' + r.sensor + '|' + r.type; }
 
-var TYPE_CN = {
-  Temperature: '温度', Load: '负载', Power: '功耗', Data: '数据',
-  Fan: '风扇', Clock: '频率', Voltage: '电压', Throughput: '速度', Level: '寿命'
-};
+// 中文名/类型标签/面板回退来自共享 lang.js;面板归属优先后端目录 /api/hwinfo
 var TYPES = ['Temperature', 'Load', 'Power', 'Data', 'Fan', 'Clock', 'Voltage', 'Throughput', 'Level'];
-
-/* 中文名与信息屏共用同一张表 */
-var CN2 = {
-  'Core (Tctl/Tdie)|Temperature': '封装温度', 'CPU Package|Temperature': '封装温度',
-  'CCD1 (Tdie)|Temperature': 'CCD 温度', 'Core Average|Temperature': '平均核温',
-  'CPU Total|Load': '总负载', 'CPU Core Max|Load': '最大核负载',
-  'CPU Package|Power': '封装功耗', 'Package|Power': '封装功耗', 'Package Power|Power': '封装功耗',
-  'Cores (Average)|Clock': '平均频率', 'Bus Speed|Clock': '总线频率',
-  'Core (SVI2 TFN)|Voltage': '核心电压', 'SoC (SVI2 TFN)|Voltage': 'SoC 电压',
-  'CPU Fan|Fan': 'CPU 风扇', 'System Fan #1|Fan': '系统风扇 1', 'System Fan #2|Fan': '系统风扇 2',
-  'System Fan #3|Fan': '系统风扇 3', 'Pump Fan|Fan': '水泵风扇',
-  'CPU|Temperature': 'CPU 温度', 'System|Temperature': '系统温度', 'Motherboard|Temperature': '主板温度',
-  'VRM MOS|Temperature': '供电 VRM', 'MOS|Temperature': '供电 MOS', 'PCH|Temperature': '芯片组',
-  'Chipset|Temperature': '芯片组', 'CPU Socket|Temperature': 'CPU 插座', 'M2 #1|Temperature': 'M.2 插槽',
-  'Vcore|Voltage': 'Vcore', '+12V|Voltage': '+12V', '+5V|Voltage': '+5V', '+3.3V|Voltage': '+3.3V',
-  'DIMM|Voltage': '内存电压', 'CMOS Battery|Voltage': '主板电池', 'VBAT|Voltage': '主板电池',
-  'GPU Core|Temperature': '核心温度', 'GPU Hot Spot|Temperature': '热点',
-  'GPU Memory Junction|Temperature': '显存温度', 'GPU Memory|Temperature': '显存温度',
-  'GPU Core|Load': '使用率', 'GPU Memory|Load': '显存占用率',
-  'GPU Memory Controller|Load': '显存控制器', 'GPU Video Engine|Load': '视频引擎',
-  'D3D 3D|Load': '3D 引擎', 'GPU Core|Clock': '核心频率', 'GPU Memory|Clock': '显存频率',
-  'GPU Fan 1|Fan': '风扇', 'GPU Fan 2|Fan': '风扇 2',
-  'GPU Package|Power': '功耗', 'GPU Power|Power': '功耗', 'GPU Board Power|Power': '整板功耗',
-  'GPU Memory Used|Data': '显存占用', 'GPU Memory Free|Data': '显存空闲', 'GPU Memory Total|Data': '显存总量',
-  'Memory|Load': '内存使用率', 'Memory Used|Data': '已用内存', 'Memory Available|Data': '可用内存',
-  'Composite Temperature|Temperature': '温度', 'Temperature|Temperature': '温度',
-  'Temperature #1|Temperature': '温度 1', 'Temperature #2|Temperature': '温度 2',
-  'Read Rate|Throughput': '读取', 'Write Rate|Throughput': '写入',
-  'Used Space|Load': '已用空间', 'Free Space|Data': '剩余空间', 'Total Space|Data': '总空间',
-  'Life|Level': '寿命', 'Data Read|Data': '累计读取', 'Data Written|Data': '累计写入',
-  'Download Speed|Throughput': '下行', 'Upload Speed|Throughput': '上行',
-  'Network Utilization|Load': '网络使用率',
-  'Uptime|Data': '运行时间', 'Volume|Load': '主音量'
-};
-function cnOf(raw, type) { return CN2[raw + '|' + type] || raw; }
-
+var hwinfo = null, liveKeys = {};
 var cfg = null, savedVisible = [];
 
 function getJson(url, cb) {
@@ -236,33 +199,46 @@ function load() {
     if (!cfg.visible) cfg.visible = [];
     if (!cfg.alarms) cfg.alarms = [];
     savedVisible = cfg.visible.slice(0);
-    getJson('/api/sensors', function (sensors) {
-      if (!sensors) { $('sensors').innerHTML = '<p class="hint">传感器列表加载失败,请刷新重试</p>'; }
-      else renderSensors(sensors);
-      renderAlarms();
-      $('webhookUrl').value = (cfg.notify && cfg.notify.webhookUrl) || '';
-      $('webhookFormat').value = (cfg.notify && cfg.notify.webhookFormat) || 'ntfy';
-      $('token').value = (cfg.notify && cfg.notify.token) || '';
-      $('interval').value = (cfg.photos && cfg.photos.intervalSeconds) || 10;
+    // 设备目录(面板归属权威源);旧 exe 404 → null,分组回退名字正则
+    getJson('/api/hwinfo', function (h) {
+      hwinfo = h || null;
+      getJson('/api/sensors', function (sensors) {
+        if (!sensors) { $('sensors').innerHTML = '<p class="hint">传感器列表加载失败,请刷新重试</p>'; }
+        else renderSensors(sensors);
+        renderAlarms();
+        $('webhookUrl').value = (cfg.notify && cfg.notify.webhookUrl) || '';
+        $('webhookFormat').value = (cfg.notify && cfg.notify.webhookFormat) || 'ntfy';
+        $('token').value = (cfg.notify && cfg.notify.token) || '';
+        $('interval').value = (cfg.photos && cfg.photos.intervalSeconds) || 10;
+      });
     });
   });
 }
 
+/* 设备 → 面板(排序用):目录优先,回退名字正则(lang.js) */
+function devicePanel(hw, sampleKey) {
+  if (hwinfo && hwinfo.keys && sampleKey && hwinfo.keys[sampleKey]
+      && typeof hwinfo.keys[sampleKey].panel === 'number')
+    return hwinfo.keys[sampleKey].panel;
+  return panelOf(hw);
+}
+
 function renderSensors(sensors) {
-  // 按硬件分组(保持采集顺序);visible 中已消失的键追加到「已失效」卡,避免静默丢失
+  // 按硬件分组,分组按面板排序(处理器→显卡→内存·主板→存储·系统),面板内保持采集顺序
   var groups = {}, order = [], i, r, hw;
+  liveKeys = {};
   for (i = 0; i < sensors.length; i++) {
     r = sensors[i];
     hw = r.hardware;
+    liveKeys[keyOf(r)] = 1;
     if (!groups[hw]) { groups[hw] = []; order.push(hw); }
     groups[hw].push(r);
   }
-  var known = {}, html = '';
-  for (i = 0; i < sensors.length; i++) known[keyOf(sensors[i])] = 1;
-  var missing = [], m;
-  for (i = 0; i < cfg.visible.length; i++)
-    if (!known[cfg.visible[i]]) missing.push(cfg.visible[i]);
+  order.sort(function (a, b) {           // 稳定排序:面板号相同保持原顺序
+    return devicePanel(a, keyOf(groups[a][0])) - devicePanel(b, keyOf(groups[b][0]));
+  });
 
+  var html = '';
   for (i = 0; i < order.length; i++) {
     hw = order[i];
     var on = 0, j;
@@ -280,15 +256,7 @@ function renderSensors(sensors) {
     }
     html += '</div>';
   }
-  if (missing.length) {
-    html += '<div class="gcard"><div class="group-h"><span class="gn">已失效的配置项(传感器已消失)</span>' +
-            '<span class="count">' + missing.length + '</span></div>';
-    for (m = 0; m < missing.length; m++)
-      html += '<label class="srow"><input class="cb" type="checkbox" data-key="' + esc(missing[m]) +
-              '" checked><span class="name" title="' + esc(missing[m]) + '">' + esc(missing[m]) +
-              '</span><span class="type-tag">—</span></label>';
-    html += '</div>';
-  }
+  // 失效键不在任何地方出现:后端启动/保存时已丢弃;这里只渲染真实存在的传感器
   $('sensors').innerHTML = html || '<p class="hint">未读到传感器</p>';
 }
 
@@ -375,7 +343,8 @@ $('alarms').onclick = function (e) { // 事件委托(旧 WebView 无 closest)
 
 function doSave() {
   var checked = toList(document.querySelectorAll('#sensors input[type=checkbox]:checked'))
-    .map(function (c) { return c.getAttribute('data-key'); });
+    .map(function (c) { return c.getAttribute('data-key'); })
+    .filter(function (k) { return !!liveKeys[k]; }); // 双保险:失效键绝不回写(后端 PUT 也会滤)
   var out = {
     visible: checked,
     alarms: collectAlarms(),

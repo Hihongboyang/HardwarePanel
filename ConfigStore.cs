@@ -101,6 +101,22 @@ internal static class ConfigStore
         Save(_current with { Visible = visible });
     }
 
+    /// <summary>
+    /// 丢弃 visible 中当前采集不到的键(设备更换 / 数据源被过滤 / LHM 升级改名)。
+    /// 启动首帧与每次 PUT 时调用;失效项前后端都不再出现,无需用户手动清理。
+    /// 取舍:设备热拔插后重启会清掉对应勾选,需重新勾选(家用常驻机可接受)。
+    /// </summary>
+    public static void SanitizeVisible(IEnumerable<string> liveKeys)
+    {
+        HashSet<string> live = [.. liveKeys];
+        AppConfig cur = _current;
+        List<string> filtered = [.. cur.Visible.Where(live.Contains)];
+        if (filtered.Count == cur.Visible.Count) return;
+        try { Save(cur with { Visible = filtered }); }
+        catch (IOException) { /* 磁盘暂不可写:下次启动/PUT 再试 */ }
+    }
+
+
     /// <summary>默认 visible 谓词：CPU 总览三项 + GPU 核显伪行 + 内存两行（实际行名以首轮采集为准）。</summary>
     internal static List<string> CreateDefaultVisible(List<SensorRow> rows)
     {

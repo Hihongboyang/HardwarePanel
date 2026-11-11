@@ -21,7 +21,8 @@
 | `AutoStartHelper.cs` | 开机自启计划任务 | `IsEnabled/Enable/Disable`（schtasks，任务名 `HardwarePanel`） |
 | `wwwroot/index.html` | 信息屏（面板式，4 面板分组） | ES5 |
 | `wwwroot/photos.html` | 图片轮播 | ES5 |
-| `wwwroot/settings.html` | 配置页（宽版分组卡片） | ES5 |
+| `wwwroot/settings.html` | 配置页（宽版分组卡片,按面板排序） | ES5 |
+| `wwwroot/lang.js` | 共享语言资源(CN2 中文名/TYPE_CN/panelOf 回退) | index/settings 共用一份 |
 | `wwwroot/notify.js` | toast 覆盖层（三页共用） | `initNotifications(es)` |
 
 ## 3. 进程与线程模型
@@ -55,7 +56,6 @@ SensorRow(Hardware, Sensor, Type, Value: double?, Unit, History: double[]?)
   "visible":  ["硬件|传感器|类型", "..."],
   "alarms":   [ { "match": "CPU Package", "type": "Temperature", "op": ">", "value": 90, "cooldownMinutes": 10 } ],
   "notify":   { "webhookUrl": "", "webhookFormat": "ntfy", "token": "" },
-  "photos":   { "intervalSeconds": 10 }
 }
 ```
 
@@ -172,8 +172,11 @@ classDiagram
 8. **`Root()` 目录解析**：优先 `AppContext.BaseDirectory`，兼容 `dotnet run`（cwd=项目根）；运行中实例按请求即时读盘 `wwwroot`，页面类改动无需重启。
 9. **发布规程**：托盘实例锁 exe 时 `mv HardwarePanel.exe HardwarePanel.exe.old` 再 publish（重命名运行中的 exe 合法）；非管理员 shell 杀不掉提权进程，`.old` 留待重启后删或被卸载清理。
 10. **逐级容错（R13 硬要求）**：任何参数获取失败不得崩溃、不得中断其它硬件。后端 `Collect` 逐硬件/逐传感器 try/catch，音量/核显计数器失败静默；前端渲染逐项 try/catch，键缺失显示 `—`，未知硬件并入「存储·系统」面板兜底。
-11. **面板归属是启发式正则而非白名单**：换机器（不同主板/显卡/磁盘）无需改代码；认不出的硬件名全部落到末面板，宁可挤一点也不丢数据。SuperIO 行挂主板名（`Collect(sub, rows, hw.Name)`）保证风扇/电压跟主板分组。
-12. **GPU 显存单位依赖 LHM 版本**：0.9.7-pre782 无 `SensorType.SmallData`（0.9.6 GUI 报告里有 `/smalldata/`），该版本 GPU 显存行为 `Data`（值即 MB）——用 `IsGpuHardware()` 判定后单位给 MB；升级 LHM 时需回归此处。
+
+11. **未知硬件名兜底到末面板**：换机器（不同主板/显卡/磁盘）无需改代码；目录/正则都认不出的硬件落到「存储·系统」，宁可挤一点也不丢数据。SuperIO 行挂主板名（`Collect(sub, rows, hw.Name)`）保证风扇/电压跟主板分组。
+12. **LHM 0.9.7-pre782 的 Data 原始值一律是字节**(内存/磁盘/显存,GUI 层才做 GB 格式化;无 `SmallData`)——后端统一 ÷1024³ 转 GB;内存条设备(`/memory/dimm`,Capacity 为 GB 直给)整组跳过。升级 LHM 后需回归 Data 单位与 `Throughput` 换算。
+13. **面板归属后端权威**：`GET /api/hwinfo` 输出 键→{device,hwType,panel} 目录，`MainForm.PanelOf(HardwareType)` 判定（Cpu→0 / Gpu*→1 / Memory+Motherboard→2 / 其余→3；Uptime 伪行钉 0、Volume 钉 3、SuperIO 跟主板）；前端 `panelOfKey()` 目录优先、旧 exe 无目录时回退名字正则，新旧版本可混跑。中文名/类型标签收敛到 `wwwroot/lang.js` 单份。
+14. **失效配置键前后端共同丢弃**：启动首帧 `SanitizeVisible` 与每次 `PUT /api/config` 都会把 visible 过滤为当前真实存在的键——换机器/过滤数据源/LHM 改名后，旧键自动从 config.json 消失，不出现在设置页与信息屏。取舍：设备热拔插后重启会清掉对应勾选，需重勾。
 
 ## 7. 构建 / 发布 / 打包
 

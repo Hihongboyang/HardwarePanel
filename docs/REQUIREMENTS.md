@@ -51,7 +51,8 @@
 |---|---|
 | `/`（index.html） | 面板式信息屏：按硬件分组固定 4 面板（处理器/显卡/内存·主板/存储·系统，未知硬件并入末面板）；每面板 1 个大字指标+5 分钟曲线，其余数字行（≤6 统计块 / 7-12 紧凑单行 / >12 紧凑双列）；`CPU Core #N` 自动汇成线程条；阈值热区（≥阈值九成变琥珀、越线变红，阈值来自 cfg.alarms）；界面中文化；键缺失显示 `—`；空 visible 引导去设置；旧机 flex 回退 |
 | `/photos.html` | 全屏交叉淡入轮播（间隔可配 ≥3s，60s 重取列表，首张随机，点击/滑动切图）；同时接收通知 |
-| `/settings.html` | 宽版（1080）：传感器按硬件分组卡片（中文名+原始名悬停）、全选/全不选/还原、失效配置项单独成卡防静默丢失；告警行编辑器（类型中文标签）+ webhook/token/轮播间隔；PUT 保存 |
+| `/settings.html` | 宽版(1080):传感器按硬件分组卡片、**分组按面板排序**(处理器→显卡→内存·主板→存储·系统);中文名+原始名悬停、全选/全不选/还原;告警行编辑器(类型中文标签)+ webhook/token/轮播间隔;PUT 保存(失效键前后端共同丢弃) |
+| `/lang.js` | 共享语言资源:CN2 中文名字典 / TYPE_CN 类型标签 / panelOf 名字正则回退,index 与 settings 共用一份 |
 | `/notify.js` | 共享 toast 覆盖层：notify 8s 自消（含 source 角标）；alarm 红左边线闪烁 + 蜂鸣 3 声 + 点击关闭；整体 try/catch 不影响页面 |
 
 ### HTTP API
@@ -59,7 +60,7 @@
 | 方法与路径 | 用途 |
 |---|---|
 | `GET /api/sensors` | 全量快照 JSON（有值行带 history 数组） |
-| `GET /api/stream` | SSE：`retry` → 全量 `data:` → 每秒增量 `data:` → `event: notify/alarm` |
+| `GET /api/hwinfo` | 设备目录 `{panels, keys:{键:{device,hwType,panel}}}`;面板归属后端权威判定 |
 | `GET /api/config` | 当前配置 JSON |
 | `PUT /api/config` | 整份替换（clamp 后落盘、换内存引用、重置告警冷却），坏 JSON 400 |
 | `POST /api/notify` | 入站通知 `{title,body,source?}`；配置 token 后需 `?token=`，不匹配 401 |

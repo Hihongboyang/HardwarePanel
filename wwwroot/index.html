@@ -126,11 +126,15 @@
 <header>
   <span class="brand">硬件监控</span>
   <span class="clock"><span class="dot" id="live"></span><span id="clock">--:--:--</span></span>
+  <a class="icon-btn" id="photos" href="/photos.html" title="图片轮播">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+  </a>
   <a class="icon-btn" id="gear" href="/settings.html" title="设置">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>
   </a>
 </header>
 <div id="panels"><div class="empty" id="boot">连接中…</div></div>
+<script src="/lang.js"></script>
 <script src="/notify.js"></script>
 <script>
 // 全 ES5:兼容安卓 5 旧 WebView(无 fetch/箭头/模板串/let/??/?./Map/Set/closest)。
@@ -144,62 +148,20 @@ var cells = {};        // key -> 单元引用与元数据
 var hist = {};         // key -> number[](hero 曲线)
 var coreRefs = [];     // 每面板线程条引用
 
-/* ---------- 中文名(键: 原始名|类型;查不到显示原名) ---------- */
-var CN2 = {
-  // 处理器(AMD / Intel)
-  'Core (Tctl/Tdie)|Temperature': '封装温度', 'CPU Package|Temperature': '封装温度',
-  'CCD1 (Tdie)|Temperature': 'CCD 温度', 'Core Average|Temperature': '平均核温',
-  'CPU Total|Load': '总负载', 'CPU Core Max|Load': '最大核负载',
-  'CPU Package|Power': '封装功耗', 'Package|Power': '封装功耗', 'Package Power|Power': '封装功耗',
-  'Cores (Average)|Clock': '平均频率', 'Bus Speed|Clock': '总线频率',
-  'Core (SVI2 TFN)|Voltage': '核心电压', 'SoC (SVI2 TFN)|Voltage': 'SoC 电压',
-  // 主板(SuperIO)
-  'CPU Fan|Fan': 'CPU 风扇', 'System Fan #1|Fan': '系统风扇 1', 'System Fan #2|Fan': '系统风扇 2',
-  'System Fan #3|Fan': '系统风扇 3', 'Pump Fan|Fan': '水泵风扇',
-  'CPU|Temperature': 'CPU 温度', 'System|Temperature': '系统温度', 'Motherboard|Temperature': '主板温度',
-  'VRM MOS|Temperature': '供电 VRM', 'MOS|Temperature': '供电 MOS', 'PCH|Temperature': '芯片组',
-  'Chipset|Temperature': '芯片组', 'CPU Socket|Temperature': 'CPU 插座', 'M2 #1|Temperature': 'M.2 插槽',
-  'Vcore|Voltage': 'Vcore', '+12V|Voltage': '+12V', '+5V|Voltage': '+5V', '+3.3V|Voltage': '+3.3V',
-  'DIMM|Voltage': '内存电压', 'CMOS Battery|Voltage': '主板电池', 'VBAT|Voltage': '主板电池',
-  // 显卡
-  'GPU Core|Temperature': '核心温度', 'GPU Hot Spot|Temperature': '热点',
-  'GPU Memory Junction|Temperature': '显存温度', 'GPU Memory|Temperature': '显存温度',
-  'GPU Core|Load': '使用率', 'GPU Memory|Load': '显存占用率',
-  'GPU Memory Controller|Load': '显存控制器', 'GPU Video Engine|Load': '视频引擎',
-  'D3D 3D|Load': '3D 引擎', 'GPU Core|Clock': '核心频率', 'GPU Memory|Clock': '显存频率',
-  'GPU Fan 1|Fan': '风扇', 'GPU Fan 2|Fan': '风扇 2',
-  'GPU Package|Power': '功耗', 'GPU Power|Power': '功耗', 'GPU Board Power|Power': '整板功耗',
-  'GPU Memory Used|Data': '显存占用', 'GPU Memory Free|Data': '显存空闲', 'GPU Memory Total|Data': '显存总量',
-  // 内存
-  'Memory|Load': '内存使用率', 'Memory Used|Data': '已用内存', 'Memory Available|Data': '可用内存',
-  // 存储
-  'Composite Temperature|Temperature': '温度', 'Temperature|Temperature': '温度',
-  'Temperature #1|Temperature': '温度 1', 'Temperature #2|Temperature': '温度 2',
-  'Read Rate|Throughput': '读取', 'Write Rate|Throughput': '写入',
-  'Used Space|Load': '已用空间', 'Free Space|Data': '剩余空间', 'Total Space|Data': '总空间',
-  'Life|Level': '寿命', 'Data Read|Data': '累计读取', 'Data Written|Data': '累计写入',
-  // 网卡
-  'Download Speed|Throughput': '下行', 'Upload Speed|Throughput': '上行',
-  'Network Utilization|Load': '网络使用率',
-  // 系统(伪行)
-  'Uptime|Data': '运行时间', 'Volume|Load': '主音量'
-};
-function cnOf(raw, type) { return CN2[raw + '|' + type] || raw; }
-
-/* ---------- 面板归属(未知硬件并入存储·系统,保证总能渲染) ---------- */
+/* ---------- 中文名 / 面板归属:共享 lang.js;面板优先用后端目录 /api/hwinfo ---------- */
+var hwinfo = null;      // {panels:[...], keys:{key:{device,hwType,panel}}}
 var PANEL_DEFS = [
   { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>', name: '处理器' },
   { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>', name: '显卡' },
   { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 19v-3"/><path d="M10 19v-3"/><path d="M14 19v-3"/><path d="M18 19v-3"/><path d="M8 11V9"/><path d="M16 11V9"/><path d="M12 11V9"/><path d="M2 15h20"/><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></svg>', name: '内存 · 主板' },
   { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/></svg>', name: '存储 · 系统' }
 ];
-function panelOf(hw) {
-  var s = hw.toLowerCase();
-  if (/ryzen|intel core|xeon|athlon|epyc|core i[3579]|\bcpu\b/.test(s)) return 0;
-  if (/nvidia|radeon|\barc\b|gpu|显卡/.test(s)) return 1;
-  if (/memory|内存/.test(s)) return 2;
-  if (/motherboard|msi|asus|gigabyte|asrock|biostar|dell|lenovo|\bhp\b|supermicro|nuvoton|\bite\b|fintek|nct\d|主板/.test(s)) return 2;
-  return 3; // 磁盘 / 网卡 / 系统 / 未知硬件
+
+/* 面板归属:后端目录(HardwareType 权威判定)优先;旧 exe 无目录时回退名字正则 */
+function panelOfKey(key, hw, raw) {
+  var e = (hwinfo && hwinfo.keys) ? hwinfo.keys[key] : null;
+  if (e && typeof e.panel === 'number') return e.panel;
+  return (raw === 'Uptime') ? 0 : panelOf(hw); // 回退:运行时间仍钉在处理器面板
 }
 
 /* ---------- 告警规则匹配(与后端 AlarmEngine 同语义) ---------- */
@@ -267,13 +229,13 @@ function fullRender(rows) {
   var visible = (cfg && cfg.visible) ? cfg.visible : [];
   for (i = 0; i < visible.length; i++) {
     var key = visible[i], row = byKey[key];
-    var parts = key.split('|');                 // 传感器消失:仍按键占位,显示「—」
-    var hw = row ? row.hardware : (parts[0] || '');
-    var raw = row ? row.sensor : (parts[1] || '');
-    var type = row ? row.type : (parts[2] || '');
-    var pi = (raw === 'Uptime') ? 0 : panelOf(hw); // 运行时间钉在处理器面板
-    sel[pi].push({ key: key, raw: raw, type: type,
-                   unit: row ? row.unit : '', history: row ? row.history : null });
+    // 全量帧里没有的键(传感器消失/数据源被过滤/配置失效):不建占位单元,
+    // 否则 hero 可能选中死键永远显示「—」;设置页「已失效的配置项」卡片会提示清理
+    if (!row) continue;
+    var raw = row.sensor;
+    var pi = panelOfKey(key, row.hardware, raw); // 后端目录优先,回退正则
+    sel[pi].push({ key: key, raw: raw, type: row.type,
+                   unit: row.unit, history: row.history });
   }
 
   cells = {}; hist = {}; coreRefs = [];
@@ -439,7 +401,7 @@ function updateCores(rows) {
         var r = rows[k];
         if (r.type !== 'Load') continue;
         if (!(/^CPU Core #\d+$/.test(r.sensor) || /^Core #\d+$/.test(r.sensor))) continue;
-        var pi = panelOf(r.hardware);
+        var pi = panelOfKey(r.hardware + '|' + r.sensor + '|' + r.type, r.hardware, r.sensor);
         if (pi !== ref.panel) continue;
         var idx = parseInt(r.sensor.replace(/[^0-9]/g, ''), 10) || (vals.length + 1);
         vals[idx - 1] = r.value;
@@ -496,26 +458,34 @@ function init() {
     cfg = c || { visible: [], alarms: [] };
     if (!cfg.visible) cfg.visible = [];
     if (!cfg.alarms) cfg.alarms = [];
-    var es = new EventSource('/api/stream');
-    es.onmessage = function (e) {
-      var rows;
-      try { rows = JSON.parse(e.data); } catch (err) { return; }
-      if (!rows) return;
-      try {
-        if (!booted) { fullRender(rows); booted = true; }
-        else applyUpdate(rows);
-      } catch (err2) { /* 渲染异常:下一帧重试 */ }
-      var now = new Date();
-      document.getElementById('clock').textContent =
-        p2(now.getHours()) + ':' + p2(now.getMinutes()) + ':' + p2(now.getSeconds());
-      document.getElementById('live').className = 'dot';
-    };
-    es.onerror = function () {
-      document.getElementById('clock').textContent = '重连中…';
-      document.getElementById('live').className = 'dot off';
-    };
-    initNotifications(es);
+    // 设备目录(面板归属权威源);失败/旧 exe 404 → 保持 null,回退名字正则
+    getJson('/api/hwinfo', function (h) {
+      hwinfo = h || null;
+      startStream();
+    });
   });
+}
+
+function startStream() {
+  var es = new EventSource('/api/stream');
+  es.onmessage = function (e) {
+    var rows;
+    try { rows = JSON.parse(e.data); } catch (err) { return; }
+    if (!rows) return;
+    try {
+      if (!booted) { fullRender(rows); booted = true; }
+      else applyUpdate(rows);
+    } catch (err2) { /* 渲染异常:下一帧重试 */ }
+    var now = new Date();
+    document.getElementById('clock').textContent =
+      p2(now.getHours()) + ':' + p2(now.getMinutes()) + ':' + p2(now.getSeconds());
+    document.getElementById('live').className = 'dot';
+  };
+  es.onerror = function () {
+    document.getElementById('clock').textContent = '重连中…';
+    document.getElementById('live').className = 'dot off';
+  };
+  initNotifications(es);
 }
 init();
 
@@ -529,8 +499,8 @@ init();
 // 常驻显示屏适配:点按全屏 + 屏幕唤醒锁(Fully Kiosk 双保险)
 document.addEventListener('click', function (e) {
   var t = e.target;
-  while (t && t.id !== 'gear' && t !== document.body) t = t.parentNode;
-  if (t && t.id === 'gear') return; // 点齿轮去设置页,不触发全屏
+  while (t && t.id !== 'gear' && t.id !== 'photos' && t !== document.body) t = t.parentNode;
+  if (t && (t.id === 'gear' || t.id === 'photos')) return; // 点图标去对应页,不触发全屏
   if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
     var p = document.documentElement.requestFullscreen();
     if (p && p.catch) p.catch(function () {});

@@ -104,6 +104,7 @@ internal sealed class MainForm : Form
     private int RefreshAll()
     {
         var rows = new List<SensorRow>();
+        var catalog = new List<HwInfoEntry>();
 
         foreach (IHardware hw in _computer.Hardware)
         {
@@ -112,9 +113,14 @@ internal sealed class MainForm : Form
             if (hw.HardwareType == HardwareType.Memory &&
                 hw.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
                 continue;
-            Collect(hw, rows);
+            // 跳过内存条设备(/memory/dimm):只有静态容量(值 16=GB 直给)与时序,非监控量,
+            // 且其 Data 会被统一字节换算算错
+            if (hw.Identifier.ToString().Contains("/memory/dimm", StringComparison.OrdinalIgnoreCase))
+                continue;
+            int panel = PanelOf(hw);
+            Collect(hw, rows, catalog, panelOverride: panel);
             foreach (IHardware sub in hw.SubHardware) // 主板 SuperIO 在这里（风扇/电压）
-                Collect(sub, rows, hw.Name);          // 行挂主板名，前端按主板分组
+                Collect(sub, rows, catalog, hw.Name, panel); // 行挂主板名,面板跟主板
         }
 
         // 以下每个来源独立容错：任何一个读不到都只是少一行，不中断采集
@@ -126,28 +132,54 @@ internal sealed class MainForm : Form
             rows.Add(new SensorRow("GPU 核显", "共享内存", "Data", Math.Round(shared / 1024 / 1024, 1), "MB"));
         }
         catch { /* 核显计数器不可用：跳过 */ }
+        AddCatalog(catalog, "GPU 核显", "gpu", 1, rows, r => r.Hardware == "GPU 核显");
 
         rows.Add(new SensorRow("系统", "Uptime", "Data",
             Math.Round(TimeSpan.FromMilliseconds(Environment.TickCount64).TotalSeconds, 0), "s"));
         rows.Add(new SensorRow("系统", "Volume", "Load", _volume.Read(), "%"));
-
+        catalog.Add(new("系统|Uptime|Data", "系统", "system", 0)); // 运行时间钉在处理器面板
+        catalog.Add(new("系统|Volume|Load", "系统", "system", 3));
 
         Render(rows);
         _hub.Publish(rows);
+        _hub.PublishCatalog(catalog);
         if (!_seeded)
         {
             _seeded = true;
             ConfigStore.SeedDefaultVisible(rows); // 首帧：新建的配置骨架填默认 visible
+            ConfigStore.SanitizeVisible(rows.Select(r => $"{r.Hardware}|{r.Sensor}|{r.Type}")); // 丢弃失效键
         }
         foreach (var (title, body) in ConfigStore.Alarms.Evaluate(ConfigStore.Current, rows))
             _hub.Notify(title, body, "alarm", isAlarm: true);
         return rows.Count;
     }
 
+    /// <summary>设备 → 面板(0-3)。后端权威判定,前端不再猜硬件名。</summary>
+    private static int PanelOf(IHardware hw) => hw.HardwareType switch
+    {
+        HardwareType.Cpu => 0,
+        HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel => 1,
+        HardwareType.Memory or HardwareType.Motherboard => 2,
+        _ => 3, // 存储 / 网卡 / 电源 / 电池 / 未知
+    };
+
+    private static void AddCatalog(List<HwInfoEntry> catalog, string device, string hwType, int panel,
+        List<SensorRow> rows, Func<SensorRow, bool> match)
+    {
+        foreach (SensorRow r in rows)
+            if (match(r))
+                catalog.Add(new($"{r.Hardware}|{r.Sensor}|{r.Type}", device, hwType, panel));
+    }
+
     /// <summary>单个硬件的采集独立容错：某个硬件/传感器读挂了只丢自己的行，不影响其它硬件。</summary>
-    private static void Collect(IHardware hw, List<SensorRow> rows, string? nameOverride = null)
+    private static void Collect(IHardware hw, List<SensorRow> rows, List<HwInfoEntry> catalog,
+        string? nameOverride = null, int? panelOverride = null)
     {
         string name = nameOverride ?? hw.Name;
+        int panel = panelOverride ?? PanelOf(hw);
+        string hwType = nameOverride is null
+            ? hw.HardwareType.ToString().ToLowerInvariant()
+            : "superio"; // 主板子硬件(芯片)归入主板面板
         try
         {
             hw.Update();
@@ -166,23 +198,19 @@ internal sealed class MainForm : Form
                     v /= 1048576.0; // 字节/秒 → MB/s
                     unit = "MB/s";
                 }
-                else if (s.SensorType == SensorType.Data && IsGpuHardware(hw))
+                else if (s.SensorType == SensorType.Data)
                 {
-                    unit = "MB";   // 此版本 LHM 的 GPU 显存行为 Data（值即 MB）
-                }
-                else if (s.SensorType == SensorType.Data && hw.HardwareType == HardwareType.Memory)
-                {
-                    v /= 1073741824.0; // 此版本 LHM 内存 Data 原始值为字节 → GB
+                    // 此版本 LHM 的 Data(内存/磁盘/显存)原始值一律是字节,GUI 层才做 GB 格式化
+                    v /= 1073741824.0; // 字节 → GB
                     unit = "GB";
                 }
                 rows.Add(new SensorRow(name, s.Name, s.SensorType.ToString(), Math.Round(v, 2), unit));
+                catalog.Add(new($"{name}|{s.Name}|{s.SensorType}", name, hwType, panel));
             }
             catch { /* 单个传感器异常：继续下一个 */ }
         }
     }
 
-    private static bool IsGpuHardware(IHardware hw) =>
-        hw.HardwareType is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel;
 
     private void Render(List<SensorRow> rows)
     {

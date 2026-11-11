@@ -7,6 +7,9 @@ public sealed record SensorRow(
     string Hardware, string Sensor, string Type, double? Value, string Unit,
     double[]? History = null);
 
+/// <summary>设备目录条目:键 → 所属设备/硬件类型/面板(0-3)。面板归属由后端按 HardwareType 判定。</summary>
+public sealed record HwInfoEntry(string Key, string Device, string HwType, int Panel);
+
 /// <summary>
 /// 维护最新传感器快照（含历史曲线），HttpListener 对外提供：
 ///   /            仪表盘页（wwwroot/index.html）
@@ -18,6 +21,10 @@ internal sealed class SensorHub : IDisposable
 {
     /// <summary>每个传感器保留 1Hz × 300 点 = 5 分钟历史。</summary>
     private const int HistoryLen = 300;
+
+    /// <summary>面板显示名(下标即面板号),与前端 lang.js 保持一致。</summary>
+    public static readonly string[] PanelNames = ["处理器", "显卡", "内存 · 主板", "存储 · 系统"];
+
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private static readonly string[] ImageExts = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"];
@@ -57,6 +64,8 @@ internal sealed class SensorHub : IDisposable
     private List<SensorRow> _rows = [];
     private CancellationTokenSource? _cts;
     private string _compact = "[]";                                  // 不含历史的增量载荷
+
+    private volatile string _hwinfoJson = "{\"panels\":[],\"keys\":{}}"; // 目录就绪前的空目录
     private readonly ManualResetEventSlim _dataReady = new(false);   // 通知 SSE 客户端
     private readonly object _clientsLock = new();
     private readonly List<SseClient> _clients = [];        // 每个连接独立事件队列，广播
@@ -93,6 +102,22 @@ internal sealed class SensorHub : IDisposable
         _dataReady.Set();
     }
 
+    /// <summary>发布设备目录(/api/hwinfo 数据源)。随采集刷新,JSON 按需序列化一次。</summary>
+    public void PublishCatalog(List<HwInfoEntry> entries)
+    {
+        Dictionary<string, HwInfoEntry> keys = [];
+        foreach (HwInfoEntry e in entries)
+            keys[e.Key] = e; // 同键后写覆盖
+        _hwinfoJson = JsonSerializer.Serialize(new { Panels = PanelNames, Keys = keys }, JsonOpts);
+    }
+
+    /// <summary>当前正在发布的全部键(配置清洗用)。</summary>
+    private HashSet<string> CurrentKeys()
+    {
+        lock (_lock) return [.. _rows.Select(r => $"{r.Hardware}|{r.Sensor}|{r.Type}")];
+    }
+
+
     public void Start(int port)
     {
         _listener.Prefixes.Add($"http://+:{port}/");
@@ -121,6 +146,9 @@ internal sealed class SensorHub : IDisposable
                 Write(ctx, "application/json; charset=utf-8",
                     JsonSerializer.Serialize(Snapshot(), JsonOpts));
                 break;
+            case "api/hwinfo":
+                Write(ctx, "application/json; charset=utf-8", _hwinfoJson);
+                break;
             case "api/images":
                 Write(ctx, "application/json; charset=utf-8",
                     JsonSerializer.Serialize(ListImages(), JsonOpts));
@@ -136,7 +164,7 @@ internal sealed class SensorHub : IDisposable
             case "api/notify":
                 HandleNotify(ctx);
                 break;
-            case "" or "index.html" or "photos.html" or "settings.html" or "notify.js":
+            case "" or "index.html" or "photos.html" or "settings.html" or "notify.js" or "lang.js":
                 ServeFile(ctx, Path.Combine(Root("wwwroot"), path == "" ? "index.html" : path),
                     path.EndsWith(".js") ? "application/javascript; charset=utf-8"
                                          : "text/html; charset=utf-8");
@@ -288,7 +316,7 @@ internal sealed class SensorHub : IDisposable
         });
     }
 
-    private static void HandlePutConfig(HttpListenerContext ctx)
+    private void HandlePutConfig(HttpListenerContext ctx)
     {
         AppConfig cfg;
         try
@@ -302,6 +330,9 @@ internal sealed class SensorHub : IDisposable
             Write(ctx, "application/json; charset=utf-8", @"{""ok"":false}");
             return;
         }
+        // 失效键即时丢弃:保存的 visible 永远只含当前真实存在的传感器
+        HashSet<string> live = CurrentKeys();
+        cfg = cfg with { Visible = [.. cfg.Visible.Where(live.Contains)] };
         ConfigStore.Save(cfg);
         ConfigStore.Alarms.ResetCooldowns();
         Write(ctx, "application/json; charset=utf-8", @"{""ok"":true}");
