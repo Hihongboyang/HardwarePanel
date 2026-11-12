@@ -496,24 +496,24 @@ init();
   if (!ok) document.documentElement.className += ' no-grid';
 })();
 
-// 常驻显示屏适配:点按全屏 + 屏幕唤醒锁(Fully Kiosk 双保险)
+// 常驻显示屏适配:点按全屏(含旧 WebView 前缀)+ 屏幕保亮(notify.js 共享)
 document.addEventListener('click', function (e) {
   var t = e.target;
   while (t && t.id !== 'gear' && t.id !== 'photos' && t !== document.body) t = t.parentNode;
   if (t && (t.id === 'gear' || t.id === 'photos')) return; // 点图标去对应页,不触发全屏
-  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-    var p = document.documentElement.requestFullscreen();
+  if (document.fullscreenElement || document.webkitFullscreenElement) return;
+  var el = document.documentElement;
+  if (el.requestFullscreen) {
+    var p = el.requestFullscreen();
     if (p && p.catch) p.catch(function () {});
+  } else if (el.webkitRequestFullscreen) {
+    try { el.webkitRequestFullscreen(); } catch (e2) { /* 忽略 */ }
   }
 });
-function keepAwake() {
-  try {
-    if (navigator.wakeLock && navigator.wakeLock.request)
-      navigator.wakeLock.request('screen').catch(function () {});
-  } catch (e) { /* 忽略 */ }
-}
-document.addEventListener('visibilitychange', function () { if (!document.hidden) keepAwake(); });
-keepAwake();
+keepScreenOn();
+document.addEventListener('visibilitychange', function () { if (!document.hidden) keepScreenOn(); });
+document.addEventListener('fullscreenchange', function () { keepScreenOn(); });
+document.addEventListener('webkitfullscreenchange', function () { keepScreenOn(); });
 </script>
 </body>
 </html>
