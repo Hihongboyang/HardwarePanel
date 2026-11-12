@@ -185,6 +185,7 @@
   <button id="saveBottom" class="save" type="button">保存</button><span class="msg" id="msgBottom"></span>
 
 <script src="/lang.js"></script>
+<script src="/notify.js"></script>
 <script>
 // 全 ES5:兼容安卓 5 旧 WebView(XHR + function/var,无 fetch/箭头/模板串/??/?./includes)。
 function $(id) { return document.getElementById(id); }
@@ -396,6 +397,9 @@ $('saveTop').onclick = doSave;
 $('saveBottom').onclick = doSave;
 
 load();
+
+var es = new EventSource('/api/stream'); // 订阅推送:toast 通知/告警(与首页、轮播页一致)
+initNotifications(es);
 </script>
 </body>
 </html>
