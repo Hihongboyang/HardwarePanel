@@ -8,22 +8,32 @@
   :root { color-scheme: dark; }
   html, body { height: 100%; overflow: hidden; }
   body { margin: 0; background: #000; }
-  /* 不用 inset 简写（Chrome 87+）：旧 WebView 用四边显式定位 */
+  /* 不用 inset 简写(Chrome 87+):旧 WebView 用四边显式定位 */
   img { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%;
         object-fit: contain; background: #000; opacity: 0;
         -webkit-transition: opacity 1s; transition: opacity 1s; }
   img.show { opacity: 1; }
-  /* 返回首页:悬浮右上角,NERV 红描边角标(直角,与首页同语言) */
-  #home { position: fixed; top: 12px; right: 12px; z-index: 10; display: flex;
+  /* 悬浮右上角按钮组:全屏切换 / 返回首页,NERV 红描边角标(直角,与首页同语言) */
+  #fs, #home { position: fixed; top: 12px; z-index: 10; display: flex;
           align-items: center; justify-content: center; width: 32px; height: 32px;
           color: #d8d8d0; background: rgba(5,5,5,.82);
           border: 1px solid rgba(204,32,32,.6);
           cursor: pointer; transition: color .15s, border-color .15s, background-color .15s; }
-  #home:hover { color: #ff5050; border-color: #ff3030; background: #0c0c0e; }
-  #home svg { width: 16px; height: 16px; }
+  #fs { right: 52px; }
+  #home { right: 12px; }
+  #fs:hover, #home:hover { color: #ff5050; border-color: #ff3030; background: #0c0c0e; }
+  #fs svg, #home svg { width: 16px; height: 16px; }
+  /* 全屏按钮图标随状态切换(进入 ↔ 退出) */
+  #fs .out { display: none; }
+  #fs.fs .in { display: none; }
+  #fs.fs .out { display: block; }
 </style>
 </head>
 <body>
+<div id="fs" title="全屏切换">
+  <svg class="in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+  <svg class="out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+</div>
 <a id="home" href="/" title="返回首页">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
 </a>
@@ -31,7 +41,7 @@
 <img id="b" alt="">
 <script src="/notify.js"></script>
 <script>
-// 全 ES5：兼容安卓 5 旧 WebView（XHR + 回调，无 fetch/async/await/箭头/?.）。
+// 全 ES5:兼容安卓 5 旧 WebView(XHR + 回调,无 fetch/async/await/箭头/?.)。
 function getJson(url, cb) {
   var x = new XMLHttpRequest();
   x.open('GET', url, true);
@@ -51,6 +61,38 @@ getJson('/api/config', function (cfg) {
     start(cfg, images || []);
   });
 });
+
+// —— 全屏切换:右上角按钮一键进出(新 API + 旧 WebView webkit 前缀)——
+function fsOn() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+var fsBtn = document.getElementById('fs');
+function toggleFs() {
+  var el = document.documentElement;
+  if (fsOn()) {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  } else if (el.requestFullscreen) {
+    var p = el.requestFullscreen();
+    if (p && p.catch) p.catch(function () {});
+  } else if (el.webkitRequestFullscreen) {
+    try { el.webkitRequestFullscreen(); } catch (e) { /* 忽略 */ }
+  }
+}
+fsBtn.onclick = function (e) {
+  if (e && e.stopPropagation) e.stopPropagation(); // 不触发"点击切下一张"
+  toggleFs();
+};
+function fsSync() {
+  fsBtn.className = fsOn() ? 'fs' : ''; // 切换进/出全屏图标
+  keepScreenOn();                        // 进出全屏会释放唤醒锁,重新申请
+}
+document.addEventListener('fullscreenchange', fsSync);
+document.addEventListener('webkitfullscreenchange', fsSync);
+
+// 屏幕保亮:优先系统唤醒锁(需 HTTPS,局域网 HTTP 下不存在),静音视频兜底(见 notify.js)
+keepScreenOn();
+document.addEventListener('visibilitychange', function () { if (!document.hidden) keepScreenOn(); });
 
 function start(cfg, images) {
   var imgs = images, idx = imgs.length ? Math.floor(Math.random() * imgs.length) : 0;
@@ -82,10 +124,10 @@ function start(cfg, images) {
     restart();
   }
   function next() { crossfade(); restart(); } // 点击切下一张并重置计时
-  document.addEventListener('click', function (e) { // 点击切下一张;点返回按钮只跳页
+  document.addEventListener('click', function (e) { // 点击切下一张;点按钮只做各自的事
     var t = e.target;
-    while (t && t.id !== 'home' && t !== document.body) t = t.parentNode;
-    if (t && t.id === 'home') return;
+    while (t && t.id !== 'home' && t.id !== 'fs' && t !== document.body) t = t.parentNode;
+    if (t && (t.id === 'home' || t.id === 'fs')) return;
     next();
   });
   var sx = null;                               // 滑动切下一张
@@ -95,21 +137,12 @@ function start(cfg, images) {
     sx = null;
   });
 
-  setInterval(function () { // 图片列表低频刷新（内容很少变化）
+  setInterval(function () { // 图片列表低频刷新(内容很少变化)
     getJson('/api/images', function (l) { if (l && l.length) imgs = l; });
   }, 60000);
 
   var es = new EventSource('/api/stream'); // 不消费 data 帧，只为接收 notify/alarm
   initNotifications(es);
-
-  function keepAwake() { // 屏幕唤醒锁（Fully Kiosk 双保险）
-    try {
-      if (navigator.wakeLock && navigator.wakeLock.request)
-        navigator.wakeLock.request('screen').catch(function () {});
-    } catch (e) { /* 忽略 */ }
-  }
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) keepAwake(); });
-  keepAwake();
 }
 </script>
 </body>
